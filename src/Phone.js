@@ -97,11 +97,12 @@ const Phone = ({ token }) => {
   let render;
   if (conn) {
     if (state === states.INCOMING) {
+      const caller = conn.parameters && (conn.parameters.From || conn.parameters.Caller) || "Unknown";
       render = (
         <div className="call-screen">
           <div className="call-number">{number}</div>
           <div className="call-status">Ringing... {timer}s</div>
-          <Incoming device={device} connection={conn} />
+          <Incoming device={device} connection={conn} caller={caller} />
         </div>
       );
     } else if (state === states.ON_CALL) {
