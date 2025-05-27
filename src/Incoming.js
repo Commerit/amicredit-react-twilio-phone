@@ -7,13 +7,14 @@ const Incoming = ({ connection, device, caller }) => {
   const audioRef = useRef();
 
   useEffect(() => {
-    if (audioRef.current) {
-      audioRef.current.play();
+    const audio = audioRef.current;
+    if (audio) {
+      audio.play();
     }
     return () => {
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current.currentTime = 0;
+      if (audio) {
+        audio.pause();
+        audio.currentTime = 0;
       }
     };
   }, []);
