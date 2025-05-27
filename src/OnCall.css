@@ -1,3 +1,33 @@
 .call-options {
   padding: 4em 0;
 }
+
+.oncall-ui {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+}
+
+.oncall-row {
+  display: flex;
+  gap: 2em;
+  margin-bottom: 1.5em;
+}
+
+.oncall-info {
+  text-align: center;
+  color: #222;
+}
+
+.oncall-number {
+  font-size: 1.3em;
+  font-weight: 500;
+  margin-bottom: 0.2em;
+}
+
+.oncall-timer {
+  font-size: 1.1em;
+  color: #007aff;
+}
