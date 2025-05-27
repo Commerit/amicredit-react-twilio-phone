@@ -4,11 +4,15 @@ const bodyParser = require("body-parser");
 const pino = require("express-pino-logger")();
 const { chatToken, videoToken, voiceToken } = require("./tokens");
 const { VoiceResponse } = require("twilio").twiml;
+const path = require("path");
 
 const app = express();
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
 app.use(pino);
+
+// Serve static files from the React app build
+app.use(express.static(path.join(__dirname, "../build")));
 
 const sendTokenResponse = (token, res) => {
   res.set("Content-Type", "application/json");
@@ -78,6 +82,11 @@ app.post("/voice/incoming", (req, res) => {
   dial.client("phil");
   res.set("Content-Type", "text/xml");
   res.send(response.toString());
+});
+
+// Catch-all handler to serve React's index.html for any other requests (client-side routing)
+app.get("*", (req, res) => {
+  res.sendFile(path.join(__dirname, "../build", "index.html"));
 });
 
 app.listen(3001, () =>
