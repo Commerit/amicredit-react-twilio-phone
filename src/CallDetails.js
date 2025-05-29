@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback } from "react";
 import "./CallDetails.css";
 
+const isTranscriptArray = (transcript) => Array.isArray(transcript);
+
 const CallDetails = ({ callId, onBack, onViewAllWithNumber }) => {
   const [call, setCall] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -117,10 +119,22 @@ const CallDetails = ({ callId, onBack, onViewAllWithNumber }) => {
         )}
 
         {call.transcript && (
-          <div className="details-section">
+          <div className="details-section transcript-section">
             <h3>Transcript</h3>
             {call.transcript === "pending" ? (
               <div className="pending-message">Transcript is being generated...</div>
+            ) : isTranscriptArray(call.transcript) ? (
+              <div className="transcript-chat">
+                {call.transcript.map((msg, idx) => (
+                  <div
+                    key={idx}
+                    className={`chat-bubble ${msg.speaker === 'agent' ? 'right' : 'left'}`}
+                  >
+                    <span className="chat-speaker">{msg.speaker === 'agent' ? 'Agent' : 'Caller'}:</span>
+                    <span className="chat-text">{msg.text}</span>
+                  </div>
+                ))}
+              </div>
             ) : (
               <div className="transcript-text">{call.transcript}</div>
             )}
