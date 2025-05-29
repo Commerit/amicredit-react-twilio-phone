@@ -132,7 +132,7 @@ app.post("/twilio/call-status", async (req, res) => {
       To: req.body.To
     });
 
-    const { CallSid, CallStatus, From, To, Direction, Timestamp, StartTime, EndTime, Duration, CallDuration, RecordingDuration } = req.body;
+    const { CallSid, CallStatus, From, To, Direction, Timestamp, StartTime, EndTime, Duration, CallDuration, RecordingDuration, ParentCallSid } = req.body;
     
     // Determine call direction based on webhook data
     let callDirection = Direction || '';
@@ -163,6 +163,7 @@ app.post("/twilio/call-status", async (req, res) => {
 
     const result = await supabase.from('call_logs').upsert({
       id: CallSid,
+      parent_call_sid: ParentCallSid || null,
       direction: callDirection,
       from_number: From,
       to_number: To,
@@ -199,13 +200,12 @@ app.post("/twilio/recording", async (req, res) => {
       const result = await supabase.from('call_logs').update({
         recording_url: RecordingUrl,
         updated_at: new Date().toISOString()
-      }).eq('id', CallSid);
-
+      })
+      .or(`id.eq.${CallSid},parent_call_sid.eq.${CallSid}`);
       if (result.error) {
         console.error("Error updating recording URL:", result.error);
         return res.status(500).json({ error: "Failed to update recording" });
       }
-
       console.log("Recording URL updated successfully");
     }
     res.sendStatus(200);
@@ -236,13 +236,12 @@ app.post("/twilio/transcription", async (req, res) => {
       const result = await supabase.from('call_logs').update({
         transcript: transcript,
         updated_at: new Date().toISOString()
-      }).eq('id', CallSid);
-
+      })
+      .or(`id.eq.${CallSid},parent_call_sid.eq.${CallSid}`);
       if (result.error) {
         console.error("Error updating transcript:", result.error);
         return res.status(500).json({ error: "Failed to update transcript" });
       }
-
       console.log("Transcript updated successfully");
     }
     res.sendStatus(200);
