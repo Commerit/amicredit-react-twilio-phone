@@ -6,5 +6,9 @@ module.exports = {
     outgoingApplicationSid: process.env.TWILIO_TWIML_APP_SID,
     incomingAllow: process.env.TWILIO_ALLOW_INCOMING_CALLS === "true",
     callerId: process.env.FROM_NUMBER
+  },
+  supabase: {
+    url: process.env.SUPABASE_URL,
+    serviceKey: process.env.SUPABASE_SERVICE_KEY
   }
 };
