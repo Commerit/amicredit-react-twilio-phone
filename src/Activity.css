@@ -1,0 +1,153 @@
+.activity-container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 20px;
+  height: 100%;
+  overflow-y: auto;
+}
+
+.activity-header {
+  margin-bottom: 20px;
+}
+
+.activity-header h2 {
+  margin-bottom: 15px;
+  color: #333;
+}
+
+.activity-filters {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.search-input {
+  flex: 1;
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.search-input:focus {
+  border-color: #4a90e2;
+}
+
+.filter-select {
+  padding: 10px 15px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-size: 14px;
+  background: white;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.filter-select:focus {
+  border-color: #4a90e2;
+}
+
+.call-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.call-item {
+  display: flex;
+  align-items: center;
+  padding: 15px;
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.call-item:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transform: translateY(-1px);
+}
+
+.call-item.missed {
+  border-left: 4px solid #f44336;
+}
+
+.call-item.inbound {
+  border-left: 4px solid #4caf50;
+}
+
+.call-item.outbound {
+  border-left: 4px solid #2196f3;
+}
+
+.call-icon {
+  font-size: 24px;
+  margin-right: 15px;
+}
+
+.call-info {
+  flex: 1;
+}
+
+.call-number {
+  font-weight: 600;
+  font-size: 16px;
+  color: #333;
+  margin-bottom: 4px;
+}
+
+.call-meta {
+  font-size: 14px;
+  color: #666;
+}
+
+.call-status {
+  display: flex;
+  gap: 8px;
+  font-size: 18px;
+}
+
+.loading {
+  text-align: center;
+  padding: 40px;
+  color: #666;
+}
+
+.no-calls {
+  text-align: center;
+  padding: 40px;
+  color: #999;
+  font-size: 16px;
+}
+
+/* Mobile responsiveness */
+@media (max-width: 600px) {
+  .activity-container {
+    padding: 10px;
+  }
+
+  .activity-filters {
+    flex-direction: column;
+  }
+
+  .call-item {
+    padding: 12px;
+  }
+
+  .call-icon {
+    font-size: 20px;
+    margin-right: 12px;
+  }
+
+  .call-number {
+    font-size: 15px;
+  }
+
+  .call-meta {
+    font-size: 13px;
+  }
+} 

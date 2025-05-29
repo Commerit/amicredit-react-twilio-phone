@@ -13,13 +13,16 @@
     "util": "^0.12.5"
   },
   "scripts": {
-    "start": "node server/index.js",
+    "postinstall": "cd server && npm install",
+    "start": "cd server && node index.js",
     "build": "react-scripts build",
+    "dev": "concurrently \"npm run server\" \"npm run react\"",
+    "react": "react-scripts start",
+    "server": "cd server && nodemon index.js",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
-    "server": "node-env-run server --exec nodemon | pino-colada",
-    "dev": "run-p server start",
-    "postinstall": "npm run build"
+    "sync-history": "node scripts/sync-twilio-history.js",
+    "test-webhooks": "node scripts/test-webhooks.js"
   },
   "proxy": "http://localhost:3001",
   "eslintConfig": {
