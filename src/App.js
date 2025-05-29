@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import "./App.css";
 import Phone from "./Phone";
 import NavigationBar from "./NavigationBar";
+import Activity from "./Activity";
 
 const Placeholder = ({ label }) => (
   <div className="placeholder">
@@ -33,7 +34,7 @@ const App = () => {
       <p>Loading...</p>
     );
   } else if (activeSection === "activity") {
-    mainContent = <Placeholder label="Activity" />;
+    mainContent = <Activity />;
   } else if (activeSection === "contacts") {
     mainContent = <Placeholder label="Contacts" />;
   } else if (activeSection === "settings") {
