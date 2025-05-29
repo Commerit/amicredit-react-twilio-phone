@@ -3,13 +3,14 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
+    "@supabase/supabase-js": "^2.49.8",
     "meyda": "^4.3.1",
     "react": "^16.9.0",
     "react-dom": "^16.9.0",
+    "react-phone-number-input": "^3.2.21",
     "react-scripts": "^5.0.1",
     "twilio-client": "^1.10.0",
-    "util": "^0.12.5",
-    "react-phone-number-input": "^3.2.21"
+    "util": "^0.12.5"
   },
   "scripts": {
     "start": "node server/index.js",
