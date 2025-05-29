@@ -13,7 +13,6 @@
     "util": "^0.12.5"
   },
   "scripts": {
-    "postinstall": "cd server && npm install",
     "start": "cd server && node index.js",
     "build": "react-scripts build",
     "dev": "concurrently \"npm run server\" \"npm run react\"",
