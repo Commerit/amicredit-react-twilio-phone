@@ -10,7 +10,8 @@
     "react-phone-number-input": "^3.2.21",
     "react-scripts": "^5.0.1",
     "twilio-client": "^1.10.0",
-    "util": "^0.12.5"
+    "util": "^0.12.5",
+    "axios": "^1.6.7"
   },
   "scripts": {
     "start": "cd server && node index.js",

@@ -6,6 +6,7 @@ const { chatToken, videoToken, voiceToken } = require("./tokens");
 const { VoiceResponse } = require("twilio").twiml;
 const path = require("path");
 const { createClient } = require('@supabase/supabase-js');
+const axios = require('axios');
 
 const app = express();
 app.use(bodyParser.urlencoded({ extended: false }));
@@ -197,16 +198,40 @@ app.post("/twilio/recording", async (req, res) => {
 
     const { CallSid, RecordingUrl } = req.body;
     if (CallSid && RecordingUrl) {
-      const result = await supabase.from('call_logs').update({
-        recording_url: RecordingUrl,
-        updated_at: new Date().toISOString()
-      })
-      .or(`id.eq.${CallSid},parent_call_sid.eq.${CallSid}`);
-      if (result.error) {
-        console.error("Error updating recording URL:", result.error);
-        return res.status(500).json({ error: "Failed to update recording" });
+      // Download the recording from Twilio (as .mp3)
+      try {
+        const twilioAuth = {
+          username: process.env.TWILIO_ACCOUNT_SID || config.twilio.accountSid,
+          password: process.env.TWILIO_AUTH_TOKEN || process.env.TWILIO_API_SECRET || config.twilio.apiSecret
+        };
+        const response = await axios.get(`${RecordingUrl}.mp3`, {
+          responseType: 'arraybuffer',
+          auth: twilioAuth,
+        });
+        const buffer = Buffer.from(response.data, 'binary');
+        const filename = `${CallSid}.mp3`;
+        // Upload to Supabase Storage
+        const { data, error } = await supabase.storage
+          .from('recordings')
+          .upload(filename, buffer, { contentType: 'audio/mpeg', upsert: true });
+        if (error) throw error;
+        // Get public URL
+        const { publicURL } = supabase.storage.from('recordings').getPublicUrl(filename);
+        // Update call_logs with public URL
+        const result = await supabase.from('call_logs').update({
+          recording_url: publicURL,
+          updated_at: new Date().toISOString()
+        })
+        .or(`id.eq.${CallSid},parent_call_sid.eq.${CallSid}`);
+        if (result.error) {
+          console.error("Error updating recording URL:", result.error);
+          return res.status(500).json({ error: "Failed to update recording" });
+        }
+        console.log("Recording uploaded to Supabase and URL updated successfully");
+      } catch (err) {
+        console.error("Error downloading/uploading recording:", err);
+        return res.status(500).json({ error: "Failed to process recording file" });
       }
-      console.log("Recording URL updated successfully");
     }
     res.sendStatus(200);
   } catch (error) {
