@@ -17,6 +17,17 @@ app.use(express.static(path.join(__dirname, "../build")));
 
 const supabase = createClient(config.supabase.url, config.supabase.serviceKey);
 
+// Helper to get the base URL for webhooks
+const getBaseUrl = (req) => {
+  // In production (Railway), use the actual host
+  if (process.env.RAILWAY_PUBLIC_DOMAIN) {
+    return `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`;
+  }
+  // Fallback to request host
+  const protocol = req.secure ? 'https' : 'http';
+  return `${protocol}://${req.get('host')}`;
+};
+
 const sendTokenResponse = (token, res) => {
   res.set("Content-Type", "application/json");
   res.send(
@@ -72,17 +83,18 @@ app.post("/voice/token", (req, res) => {
 
 app.post("/voice", (req, res) => {
   const To = req.body.To;
+  const baseUrl = getBaseUrl(req);
   const response = new VoiceResponse();
   const dial = response.dial({
     callerId: config.twilio.callerId,
     record: "record-from-answer-dual",
-    recordingStatusCallback: "https://YOUR_BACKEND_URL/twilio/recording",
+    recordingStatusCallback: `${baseUrl}/twilio/recording`,
     recordingStatusCallbackEvent: "completed",
     recordingStatusCallbackMethod: "POST"
   });
   dial.number({
     statusCallbackEvent: "initiated ringing answered completed",
-    statusCallback: "https://YOUR_BACKEND_URL/twilio/call-status",
+    statusCallback: `${baseUrl}/twilio/call-status`,
     statusCallbackMethod: "POST"
   }, To);
   res.set("Content-Type", "text/xml");
@@ -90,18 +102,19 @@ app.post("/voice", (req, res) => {
 });
 
 app.post("/voice/incoming", (req, res) => {
+  const baseUrl = getBaseUrl(req);
   const response = new VoiceResponse();
   const dial = response.dial({
     callerId: req.body.From,
     answerOnBridge: true,
     record: "record-from-answer-dual",
-    recordingStatusCallback: "https://YOUR_BACKEND_URL/twilio/recording",
+    recordingStatusCallback: `${baseUrl}/twilio/recording`,
     recordingStatusCallbackEvent: "completed",
     recordingStatusCallbackMethod: "POST"
   });
   dial.client({
     statusCallbackEvent: "initiated ringing answered completed",
-    statusCallback: "https://YOUR_BACKEND_URL/twilio/call-status",
+    statusCallback: `${baseUrl}/twilio/call-status`,
     statusCallbackMethod: "POST"
   }, "phil");
   res.set("Content-Type", "text/xml");
@@ -110,45 +123,112 @@ app.post("/voice/incoming", (req, res) => {
 
 // Webhook endpoints for Twilio events
 app.post("/twilio/call-status", async (req, res) => {
-  // Log or update call status in Supabase
-  const { CallSid, CallStatus, From, To, Direction, Timestamp, StartTime, EndTime, Duration } = req.body;
-  // Upsert call log
-  await supabase.from('call_logs').upsert({
-    id: CallSid,
-    direction: Direction || '',
-    from_number: From,
-    to_number: To,
-    started_at: StartTime || Timestamp || new Date().toISOString(),
-    ended_at: EndTime || null,
-    duration_seconds: Duration ? parseInt(Duration) : null,
-    status: CallStatus,
-    updated_at: new Date().toISOString()
-  }, { onConflict: ['id'] });
-  res.sendStatus(200);
+  try {
+    console.log("Call status webhook received:", {
+      CallSid: req.body.CallSid,
+      CallStatus: req.body.CallStatus,
+      Direction: req.body.Direction,
+      From: req.body.From,
+      To: req.body.To
+    });
+
+    const { CallSid, CallStatus, From, To, Direction, Timestamp, StartTime, EndTime, Duration } = req.body;
+    
+    // Determine call direction based on webhook data
+    let callDirection = Direction || '';
+    if (!callDirection && req.body.Caller && req.body.Called) {
+      // For outbound calls from the client
+      callDirection = 'outbound-dial';
+    }
+    
+    // Map Twilio statuses to our internal statuses
+    let internalStatus = CallStatus;
+    if (CallStatus === 'busy' || CallStatus === 'no-answer' || CallStatus === 'failed') {
+      internalStatus = 'missed';
+    } else if (CallStatus === 'completed') {
+      internalStatus = 'completed';
+    }
+
+    const result = await supabase.from('call_logs').upsert({
+      id: CallSid,
+      direction: callDirection,
+      from_number: From,
+      to_number: To,
+      started_at: StartTime || Timestamp || new Date().toISOString(),
+      ended_at: EndTime || (CallStatus === 'completed' ? new Date().toISOString() : null),
+      duration_seconds: Duration ? parseInt(Duration) : null,
+      status: internalStatus,
+      updated_at: new Date().toISOString()
+    }, { onConflict: 'id' });
+
+    if (result.error) {
+      console.error("Error upserting call log:", result.error);
+      return res.status(500).json({ error: "Failed to log call" });
+    }
+
+    console.log("Call log upserted successfully");
+    res.sendStatus(200);
+  } catch (error) {
+    console.error("Exception in call-status webhook:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
 });
 
 app.post("/twilio/recording", async (req, res) => {
-  // Log/update recording URL in Supabase
-  const { CallSid, RecordingUrl } = req.body;
-  if (CallSid && RecordingUrl) {
-    await supabase.from('call_logs').update({
-      recording_url: RecordingUrl,
-      updated_at: new Date().toISOString()
-    }).eq('id', CallSid);
+  try {
+    console.log("Recording webhook received:", {
+      CallSid: req.body.CallSid,
+      RecordingUrl: req.body.RecordingUrl,
+      RecordingStatus: req.body.RecordingStatus
+    });
+
+    const { CallSid, RecordingUrl } = req.body;
+    if (CallSid && RecordingUrl) {
+      const result = await supabase.from('call_logs').update({
+        recording_url: RecordingUrl,
+        updated_at: new Date().toISOString()
+      }).eq('id', CallSid);
+
+      if (result.error) {
+        console.error("Error updating recording URL:", result.error);
+        return res.status(500).json({ error: "Failed to update recording" });
+      }
+
+      console.log("Recording URL updated successfully");
+    }
+    res.sendStatus(200);
+  } catch (error) {
+    console.error("Exception in recording webhook:", error);
+    res.status(500).json({ error: "Internal server error" });
   }
-  res.sendStatus(200);
 });
 
 app.post("/twilio/transcription", async (req, res) => {
-  // Log/update transcript in Supabase
-  const { CallSid, TranscriptionText } = req.body;
-  if (CallSid && TranscriptionText) {
-    await supabase.from('call_logs').update({
-      transcript: TranscriptionText,
-      updated_at: new Date().toISOString()
-    }).eq('id', CallSid);
+  try {
+    console.log("Transcription webhook received:", {
+      CallSid: req.body.CallSid,
+      TranscriptionStatus: req.body.TranscriptionStatus
+    });
+
+    const { CallSid, TranscriptionText } = req.body;
+    if (CallSid && TranscriptionText) {
+      const result = await supabase.from('call_logs').update({
+        transcript: TranscriptionText,
+        updated_at: new Date().toISOString()
+      }).eq('id', CallSid);
+
+      if (result.error) {
+        console.error("Error updating transcript:", result.error);
+        return res.status(500).json({ error: "Failed to update transcript" });
+      }
+
+      console.log("Transcript updated successfully");
+    }
+    res.sendStatus(200);
+  } catch (error) {
+    console.error("Exception in transcription webhook:", error);
+    res.status(500).json({ error: "Internal server error" });
   }
-  res.sendStatus(200);
 });
 
 // List calls with optional filters
