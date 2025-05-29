@@ -132,7 +132,7 @@ app.post("/twilio/call-status", async (req, res) => {
       To: req.body.To
     });
 
-    const { CallSid, CallStatus, From, To, Direction, Timestamp, StartTime, EndTime, Duration } = req.body;
+    const { CallSid, CallStatus, From, To, Direction, Timestamp, StartTime, EndTime, Duration, CallDuration, RecordingDuration } = req.body;
     
     // Determine call direction based on webhook data
     let callDirection = Direction || '';
@@ -149,6 +149,18 @@ app.post("/twilio/call-status", async (req, res) => {
       internalStatus = 'completed';
     }
 
+    // Calculate duration
+    let durationSeconds = null;
+    if (CallDuration) {
+      durationSeconds = parseInt(CallDuration);
+    } else if (RecordingDuration) {
+      durationSeconds = parseInt(RecordingDuration);
+    } else if (Duration) {
+      durationSeconds = parseInt(Duration);
+    } else if (StartTime && EndTime) {
+      durationSeconds = Math.floor((new Date(EndTime) - new Date(StartTime)) / 1000);
+    }
+
     const result = await supabase.from('call_logs').upsert({
       id: CallSid,
       direction: callDirection,
@@ -156,7 +168,7 @@ app.post("/twilio/call-status", async (req, res) => {
       to_number: To,
       started_at: StartTime || Timestamp || new Date().toISOString(),
       ended_at: EndTime || (CallStatus === 'completed' ? new Date().toISOString() : null),
-      duration_seconds: Duration ? parseInt(Duration) : null,
+      duration_seconds: durationSeconds,
       status: internalStatus,
       updated_at: new Date().toISOString()
     }, { onConflict: 'id' });
@@ -211,9 +223,18 @@ app.post("/twilio/transcription", async (req, res) => {
     });
 
     const { CallSid, TranscriptionText } = req.body;
-    if (CallSid && TranscriptionText) {
+    let transcript = TranscriptionText;
+    // Try to parse as JSON array for chat UI
+    try {
+      if (typeof transcript === 'string' && transcript.trim().startsWith('[')) {
+        transcript = JSON.parse(transcript);
+      }
+    } catch (e) {
+      // fallback to raw string
+    }
+    if (CallSid && transcript) {
       const result = await supabase.from('call_logs').update({
-        transcript: TranscriptionText,
+        transcript: transcript,
         updated_at: new Date().toISOString()
       }).eq('id', CallSid);
 
