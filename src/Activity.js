@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import "./Activity.css";
 import CallDetails from "./CallDetails";
 
@@ -13,6 +13,31 @@ const Activity = () => {
     endDate: ""
   });
   const refreshIntervalRef = useRef(null);
+
+  const fetchCalls = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (filters.direction === "missed") {
+        params.append("status", "missed");
+      } else if (filters.direction) {
+        params.append("direction", filters.direction);
+      }
+      if (filters.search) params.append("search", filters.search);
+      if (filters.startDate) params.append("start", filters.startDate);
+      if (filters.endDate) params.append("end", filters.endDate);
+      params.append("limit", "50");
+
+      const response = await fetch(`/api/calls?${params}`);
+      const data = await response.json();
+      setCalls(data || []);
+    } catch (error) {
+      console.error("Error fetching calls:", error);
+      setCalls([]);
+    } finally {
+      if (!silent) setLoading(false);
+    }
+  }, [filters]);
 
   useEffect(() => {
     fetchCalls();
@@ -46,31 +71,6 @@ const Activity = () => {
       }
     };
   }, [calls, fetchCalls]);
-
-  const fetchCalls = async (silent = false) => {
-    if (!silent) setLoading(true);
-    try {
-      const params = new URLSearchParams();
-      if (filters.direction === "missed") {
-        params.append("status", "missed");
-      } else if (filters.direction) {
-        params.append("direction", filters.direction);
-      }
-      if (filters.search) params.append("search", filters.search);
-      if (filters.startDate) params.append("start", filters.startDate);
-      if (filters.endDate) params.append("end", filters.endDate);
-      params.append("limit", "50");
-
-      const response = await fetch(`/api/calls?${params}`);
-      const data = await response.json();
-      setCalls(data || []);
-    } catch (error) {
-      console.error("Error fetching calls:", error);
-      setCalls([]);
-    } finally {
-      if (!silent) setLoading(false);
-    }
-  };
 
   const formatDuration = (seconds) => {
     if (!seconds) return "0s";

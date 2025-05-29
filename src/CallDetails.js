@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import "./CallDetails.css";
 
 const CallDetails = ({ callId, onBack, onViewAllWithNumber }) => {
@@ -6,11 +6,7 @@ const CallDetails = ({ callId, onBack, onViewAllWithNumber }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
-    fetchCallDetails();
-  }, [callId, fetchCallDetails]);
-
-  const fetchCallDetails = async () => {
+  const fetchCallDetails = useCallback(async () => {
     setLoading(true);
     try {
       const response = await fetch(`/api/calls/${callId}`);
@@ -26,7 +22,11 @@ const CallDetails = ({ callId, onBack, onViewAllWithNumber }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [callId]);
+
+  useEffect(() => {
+    fetchCallDetails();
+  }, [callId, fetchCallDetails]);
 
   const formatDuration = (seconds) => {
     if (!seconds) return "0s";
