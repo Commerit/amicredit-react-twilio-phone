@@ -16,7 +16,7 @@ const Activity = () => {
 
   useEffect(() => {
     fetchCalls();
-  }, [filters]);
+  }, [filters, fetchCalls]);
 
   // Auto-refresh for pending recordings/transcripts
   useEffect(() => {
@@ -45,7 +45,7 @@ const Activity = () => {
         clearInterval(refreshIntervalRef.current);
       }
     };
-  }, [calls]);
+  }, [calls, fetchCalls]);
 
   const fetchCalls = async (silent = false) => {
     if (!silent) setLoading(true);

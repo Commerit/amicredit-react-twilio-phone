@@ -8,7 +8,7 @@ const CallDetails = ({ callId, onBack, onViewAllWithNumber }) => {
 
   useEffect(() => {
     fetchCallDetails();
-  }, [callId]);
+  }, [callId, fetchCallDetails]);
 
   const fetchCallDetails = async () => {
     setLoading(true);
