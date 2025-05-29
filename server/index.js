@@ -249,25 +249,51 @@ app.post("/twilio/transcription", async (req, res) => {
 
     const { CallSid, TranscriptionText } = req.body;
     let transcript = TranscriptionText;
+    let isChat = false;
     // Try to parse as JSON array for chat UI
     try {
       if (typeof transcript === 'string' && transcript.trim().startsWith('[')) {
         transcript = JSON.parse(transcript);
+        isChat = true;
       }
     } catch (e) {
       // fallback to raw string
     }
     if (CallSid && transcript) {
-      const result = await supabase.from('call_logs').update({
-        transcript: transcript,
-        updated_at: new Date().toISOString()
-      })
-      .or(`id.eq.${CallSid},parent_call_sid.eq.${CallSid}`);
-      if (result.error) {
-        console.error("Error updating transcript:", result.error);
-        return res.status(500).json({ error: "Failed to update transcript" });
+      // Upload transcript to Supabase Storage
+      let fileBuffer, filename, contentType;
+      if (isChat) {
+        fileBuffer = Buffer.from(JSON.stringify(transcript, null, 2), 'utf-8');
+        filename = `${CallSid}.json`;
+        contentType = 'application/json';
+      } else {
+        fileBuffer = Buffer.from(typeof transcript === 'string' ? transcript : JSON.stringify(transcript), 'utf-8');
+        filename = `${CallSid}.txt`;
+        contentType = 'text/plain';
       }
-      console.log("Transcript updated successfully");
+      try {
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('transcripts')
+          .upload(filename, fileBuffer, { contentType, upsert: true });
+        if (uploadError) throw uploadError;
+        // Get public URL
+        const { publicURL } = supabase.storage.from('transcripts').getPublicUrl(filename);
+        // Update call_logs with transcript_url and transcript (for chat UI)
+        const result = await supabase.from('call_logs').update({
+          transcript: transcript,
+          transcript_url: publicURL,
+          updated_at: new Date().toISOString()
+        })
+        .or(`id.eq.${CallSid},parent_call_sid.eq.${CallSid}`);
+        if (result.error) {
+          console.error("Error updating transcript:", result.error);
+          return res.status(500).json({ error: "Failed to update transcript" });
+        }
+        console.log("Transcript uploaded to Supabase and URL updated successfully");
+      } catch (err) {
+        console.error("Error uploading transcript file:", err);
+        return res.status(500).json({ error: "Failed to process transcript file" });
+      }
     }
     res.sendStatus(200);
   } catch (error) {
