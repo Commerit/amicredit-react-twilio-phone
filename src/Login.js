@@ -14,7 +14,8 @@ export default function Login() {
     e.preventDefault();
     setError('');
     setLoading(true);
-    const { user, error: loginError } = await supabase.auth.signIn({ email, password });
+    const { data, error: loginError } = await supabase.auth.signInWithPassword({ email, password });
+    const user = data?.user;
     if (loginError) {
       setError(loginError.message === 'Invalid login credentials' ? 'Incorrect password' : loginError.message);
       setLoading(false);
@@ -23,12 +24,12 @@ export default function Login() {
     if (user) {
       setUser(user);
       // Fetch user profile
-      const { data, error: profileError } = await supabase
+      const { data: profileData, error: profileError } = await supabase
         .from('users')
         .select('email, full_name, twilio_phone_number, role')
         .eq('id', user.id)
         .single();
-      if (!profileError) setUserProfile(data);
+      if (!profileError) setUserProfile(profileData);
       navigate('/');
     } else {
       setError('Login failed.');

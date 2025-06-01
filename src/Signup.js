@@ -34,7 +34,8 @@ export default function Signup() {
     }
     setLoading(true);
     // 1. Create Supabase Auth user
-    const { user, error: signupError } = await supabase.auth.signUp({ email, password });
+    const { data, error: signupError } = await supabase.auth.signUp({ email, password });
+    const user = data?.user;
     if (signupError) {
       setError(signupError.message);
       setLoading(false);
@@ -47,7 +48,7 @@ export default function Signup() {
     }
     setUser(user);
     // 2. Insert into users table
-    const { data, error: userError } = await supabase
+    const { data: userData, error: userError } = await supabase
       .from('users')
       .insert({ id: user.id, email, full_name: fullName, twilio_phone_number: twilioPhone, role: 'agent' })
       .single();
@@ -56,7 +57,7 @@ export default function Signup() {
       setLoading(false);
       return;
     }
-    setUserProfile(data);
+    setUserProfile(userData);
     navigate('/');
     setLoading(false);
   };
