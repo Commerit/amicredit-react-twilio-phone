@@ -10,6 +10,7 @@ import Phone from "./Phone";
 import NavigationBar from "./NavigationBar";
 import { Device } from "twilio-client";
 import Incoming from "./Incoming";
+import Settings from "./Settings";
 
 function PrivateRoute({ children }) {
   const { user, loading } = useAuth();
@@ -145,7 +146,7 @@ const App = () => {
   } else if (activeSection === "contacts") {
     mainContent = <Placeholder label="Contacts" />;
   } else if (activeSection === "settings") {
-    mainContent = <Placeholder label="Settings" />;
+    mainContent = <Settings />;
   }
 
   return (
@@ -155,6 +156,7 @@ const App = () => {
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/settings" element={<PrivateRoute><Settings /></PrivateRoute>} />
           <Route path="/" element={
             <PrivateRoute>
               <div className="app">

@@ -1,6 +1,7 @@
 import React from "react";
 import "./NavigationBar.css";
 import { useAuth } from './AuthContext';
+import { useNavigate } from 'react-router-dom';
 
 const navItems = [
   { key: "dialer", label: "Dialer", icon: "\u260E\uFE0F" }, // phone emoji
@@ -11,6 +12,14 @@ const navItems = [
 
 const NavigationBar = ({ active, onChange }) => {
   const { logout } = useAuth();
+  const navigate = useNavigate();
+  const handleNav = (key) => {
+    if (key === "settings") {
+      navigate("/settings");
+    } else {
+      onChange(key);
+    }
+  };
   return (
     <nav className="navigation-bar">
       <div className="nav-items">
@@ -18,7 +27,7 @@ const NavigationBar = ({ active, onChange }) => {
           <button
             key={item.key}
             className={`nav-item${active === item.key ? " active" : ""}`}
-            onClick={() => onChange(item.key)}
+            onClick={() => handleNav(item.key)}
             aria-label={item.label}
           >
             <span className="nav-icon">{item.icon}</span>
