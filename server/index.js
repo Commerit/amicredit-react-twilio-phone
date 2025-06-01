@@ -296,10 +296,7 @@ app.post("/twilio/recording", async (req, res) => {
 
 app.post("/twilio/transcription", async (req, res) => {
   try {
-    console.log("Transcription webhook received:", {
-      CallSid: req.body.CallSid,
-      TranscriptionStatus: req.body.TranscriptionStatus
-    });
+    console.log("Transcription webhook received:", req.body);
 
     const { CallSid, TranscriptionText } = req.body;
     let transcript = TranscriptionText;
@@ -314,7 +311,7 @@ app.post("/twilio/transcription", async (req, res) => {
       // fallback to raw string
     }
     if (CallSid && transcript) {
-      // Upload transcript to Supabase Storage
+      // Prepare transcript file for upload
       let fileBuffer, filename, contentType;
       if (isChat) {
         fileBuffer = Buffer.from(JSON.stringify(transcript, null, 2), 'utf-8');
@@ -325,20 +322,28 @@ app.post("/twilio/transcription", async (req, res) => {
         filename = `${CallSid}.txt`;
         contentType = 'text/plain';
       }
+      console.log('[TRANSCRIPT] Prepared file:', { filename, contentType, transcript });
       try {
+        // Upload to Supabase Storage
         const { data: uploadData, error: uploadError } = await supabase.storage
           .from('transcripts')
           .upload(filename, fileBuffer, { contentType, upsert: true });
+        console.log('[TRANSCRIPT] Upload result:', { uploadData, uploadError });
         if (uploadError) throw uploadError;
-        // Get public URL
-        const { publicURL } = supabase.storage.from('transcripts').getPublicUrl(filename);
-        // Update call_logs with transcript_url and transcript (for chat UI)
-        const result = await supabase.from('call_logs').upsert({
+        // Manually construct the public URL
+        const supabaseUrl = config.supabase.url || process.env.SUPABASE_URL;
+        const manualPublicUrl = `${supabaseUrl}/storage/v1/object/public/transcripts/${filename}`;
+        console.log('[TRANSCRIPT] Manually constructed public URL:', manualPublicUrl);
+        // Upsert transcript_url and transcript into call_logs
+        const upsertPayload = {
           id: CallSid,
           transcript: transcript,
-          transcript_url: publicURL,
+          transcript_url: manualPublicUrl,
           updated_at: new Date().toISOString()
-        }, { onConflict: 'id' });
+        };
+        console.log('[TRANSCRIPT] Upsert payload:', upsertPayload);
+        const result = await supabase.from('call_logs').upsert(upsertPayload, { onConflict: 'id' });
+        console.log('[TRANSCRIPT] Upsert result:', result);
         if (result.error) {
           console.error("Error upserting transcript:", result.error);
           return res.status(500).json({ error: "Failed to update transcript" });
@@ -348,6 +353,8 @@ app.post("/twilio/transcription", async (req, res) => {
         console.error("Error uploading transcript file:", err);
         return res.status(500).json({ error: "Failed to process transcript file" });
       }
+    } else {
+      console.warn('[TRANSCRIPT] Missing CallSid or transcript:', { CallSid, transcript });
     }
     res.sendStatus(200);
   } catch (error) {
