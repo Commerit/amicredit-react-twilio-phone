@@ -4,14 +4,15 @@
   "private": true,
   "dependencies": {
     "@supabase/supabase-js": "^2.49.8",
+    "axios": "^1.6.7",
     "meyda": "^4.3.1",
-    "react": "^16.9.0",
-    "react-dom": "^16.9.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
     "react-phone-number-input": "^3.2.21",
+    "react-router-dom": "^7.6.1",
     "react-scripts": "^5.0.1",
     "twilio-client": "^1.10.0",
-    "util": "^0.12.5",
-    "axios": "^1.6.7"
+    "util": "^0.12.5"
   },
   "scripts": {
     "start": "cd server && node index.js",
