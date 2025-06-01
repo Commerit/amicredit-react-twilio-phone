@@ -218,16 +218,16 @@ app.post("/twilio/recording", async (req, res) => {
         // Get public URL
         const { publicURL } = supabase.storage.from('recordings').getPublicUrl(filename);
         // Update call_logs with public URL
-        const result = await supabase.from('call_logs').update({
+        const result = await supabase.from('call_logs').upsert({
+          id: CallSid,
           recording_url: publicURL,
           updated_at: new Date().toISOString()
-        })
-        .or(`id.eq.${CallSid},parent_call_sid.eq.${CallSid}`);
+        }, { onConflict: 'id' });
         if (result.error) {
-          console.error("Error updating recording URL:", result.error);
+          console.error("Error upserting recording URL:", result.error);
           return res.status(500).json({ error: "Failed to update recording" });
         }
-        console.log("Recording uploaded to Supabase and URL updated successfully");
+        console.log("Recording uploaded to Supabase and URL upserted successfully");
       } catch (err) {
         console.error("Error downloading/uploading recording:", err);
         return res.status(500).json({ error: "Failed to process recording file" });
@@ -279,17 +279,17 @@ app.post("/twilio/transcription", async (req, res) => {
         // Get public URL
         const { publicURL } = supabase.storage.from('transcripts').getPublicUrl(filename);
         // Update call_logs with transcript_url and transcript (for chat UI)
-        const result = await supabase.from('call_logs').update({
+        const result = await supabase.from('call_logs').upsert({
+          id: CallSid,
           transcript: transcript,
           transcript_url: publicURL,
           updated_at: new Date().toISOString()
-        })
-        .or(`id.eq.${CallSid},parent_call_sid.eq.${CallSid}`);
+        }, { onConflict: 'id' });
         if (result.error) {
-          console.error("Error updating transcript:", result.error);
+          console.error("Error upserting transcript:", result.error);
           return res.status(500).json({ error: "Failed to update transcript" });
         }
-        console.log("Transcript uploaded to Supabase and URL updated successfully");
+        console.log("Transcript uploaded to Supabase and URL upserted successfully");
       } catch (err) {
         console.error("Error uploading transcript file:", err);
         return res.status(500).json({ error: "Failed to process transcript file" });
