@@ -228,12 +228,20 @@ app.post("/twilio/recording", async (req, res) => {
         if (callLog) {
           // Upsert with all existing fields, just updating recording_url and updated_at
           const updatedLog = { ...callLog, recording_url: publicURL, updated_at: new Date().toISOString() };
+          console.log('[PARENT UPSERT] Payload:', updatedLog);
           const result = await supabase.from('call_logs').upsert(updatedLog, { onConflict: 'id' });
+          console.log('[PARENT UPSERT] Result:', result);
           if (result.error) {
             console.error("Error upserting recording URL for id:", CallSid, result.error);
             return res.status(500).json({ error: "Failed to update recording" });
           }
-          console.log(`Recording URL updated for call log id: ${CallSid}`);
+          // Fetch and log the row after upsert
+          const { data: afterUpsert, error: afterUpsertError } = await supabase
+            .from('call_logs')
+            .select('*')
+            .eq('id', CallSid)
+            .single();
+          console.log('[PARENT UPSERT] Row after upsert:', afterUpsert, afterUpsertError);
           updatedAny = true;
         }
         // Now update ALL children where parent_call_sid matches
@@ -246,11 +254,22 @@ app.post("/twilio/recording", async (req, res) => {
         } else if (childLogs && childLogs.length > 0) {
           for (const child of childLogs) {
             const updatedChild = { ...child, recording_url: publicURL, updated_at: new Date().toISOString() };
-            const result = await supabase.from('call_logs').upsert(updatedChild, { onConflict: 'id' });
-            if (result.error) {
-              console.error(`Error upserting recording URL for child id: ${child.id}`, result.error);
+            console.log(`[CHILD UPSERT] Payload for child id ${child.id}:`, updatedChild);
+            const upsertResult = await supabase.from('call_logs').upsert(updatedChild, { onConflict: 'id' });
+            console.log(`[CHILD UPSERT] Upsert result for child id ${child.id}:`, upsertResult);
+            if (upsertResult.error) {
+              console.error(`Error upserting recording URL for child id: ${child.id}`, upsertResult.error);
             } else {
-              console.log(`Recording URL updated for child call log id: ${child.id}`);
+              // Try a direct update as well
+              const updateResult = await supabase.from('call_logs').update({ recording_url: publicURL, updated_at: new Date().toISOString() }).eq('id', child.id);
+              console.log(`[CHILD UPDATE] Direct update result for child id ${child.id}:`, updateResult);
+              // Fetch and log the row after update
+              const { data: afterUpdate, error: afterUpdateError } = await supabase
+                .from('call_logs')
+                .select('*')
+                .eq('id', child.id)
+                .single();
+              console.log(`[CHILD] Row after update for child id ${child.id}:`, afterUpdate, afterUpdateError);
               updatedAny = true;
             }
           }
