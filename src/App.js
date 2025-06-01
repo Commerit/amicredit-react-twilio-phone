@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './AuthContext';
 import Login from './Login';
@@ -8,6 +8,9 @@ import Activity from './Activity';
 import "./App.css";
 import Phone from "./Phone";
 import NavigationBar from "./NavigationBar";
+import { Device } from "twilio-client";
+import Incoming from "./Incoming";
+import states from "./states";
 
 function PrivateRoute({ children }) {
   const { user, loading } = useAuth();
@@ -22,11 +25,96 @@ const Placeholder = ({ label }) => (
   </div>
 );
 
+const ringtoneUrl = "https://actions.google.com/sounds/v1/alarms/phone_alerts_and_rings.ogg";
+
 const App = () => {
   const [token, setToken] = useState(null);
   const [clicked, setClicked] = useState(false);
   const [activeSection, setActiveSection] = useState("dialer");
+  const [device, setDevice] = useState(null);
+  const [incomingConn, setIncomingConn] = useState(null);
+  const [incomingCaller, setIncomingCaller] = useState("");
+  const [incomingRinging, setIncomingRinging] = useState(false);
   const identity = "phil";
+  const tokenRef = useRef(token);
+  const ringerRef = useRef();
+
+  useEffect(() => { tokenRef.current = token; }, [token]);
+
+  // Setup Twilio Device globally
+  useEffect(() => {
+    if (!token) return;
+    const device = new Device();
+    device.setup(token, { debug: true });
+    setDevice(device);
+
+    device.on("ready", () => {
+      // ready
+    });
+    device.on("incoming", connection => {
+      setIncomingConn(connection);
+      setIncomingCaller((connection.parameters && (connection.parameters.From || connection.parameters.Caller)) || "Unknown");
+      setIncomingRinging(true);
+      connection.on("reject", () => {
+        setIncomingConn(null);
+        setIncomingRinging(false);
+      });
+      connection.on("cancel", () => {
+        setIncomingConn(null);
+        setIncomingRinging(false);
+      });
+    });
+    device.on("cancel", () => {
+      setIncomingConn(null);
+      setIncomingRinging(false);
+    });
+    device.on("reject", () => {
+      setIncomingConn(null);
+      setIncomingRinging(false);
+    });
+    device.on("disconnect", () => {
+      setIncomingConn(null);
+      setIncomingRinging(false);
+    });
+    return () => {
+      device.destroy();
+      setDevice(null);
+    };
+  }, [token]);
+
+  // Request notification permission on load
+  useEffect(() => {
+    if (window.Notification && Notification.permission !== "granted") {
+      Notification.requestPermission();
+    }
+  }, []);
+
+  // Play ringer and show browser notification on incoming call
+  useEffect(() => {
+    if (incomingConn && incomingRinging) {
+      // Play ringer
+      if (ringerRef.current) {
+        ringerRef.current.currentTime = 0;
+        ringerRef.current.play();
+      }
+      // Show browser notification if not focused
+      if (window.Notification && document.visibilityState !== "visible" && Notification.permission === "granted") {
+        const notification = new Notification("Incoming Call", {
+          body: `Call from ${incomingCaller}`,
+          icon: "/logo.png"
+        });
+        notification.onclick = () => {
+          window.focus();
+        };
+      }
+    } else {
+      // Stop ringer
+      if (ringerRef.current) {
+        ringerRef.current.pause();
+        ringerRef.current.currentTime = 0;
+      }
+    }
+  }, [incomingConn, incomingRinging, incomingCaller]);
 
   const handleClick = () => {
     setClicked(true);
@@ -39,8 +127,8 @@ const App = () => {
   if (activeSection === "dialer") {
     mainContent = !clicked ? (
       <button className="connect-btn" onClick={handleClick}>Connect to Phone</button>
-    ) : token ? (
-      <Phone token={token} />
+    ) : token && device ? (
+      <Phone token={token} device={device} />
     ) : (
       <p>Loading...</p>
     );
@@ -64,6 +152,11 @@ const App = () => {
               <div className="app">
                 <main className="main-content">{mainContent}</main>
                 <NavigationBar active={activeSection} onChange={setActiveSection} />
+                {/* Global ringer audio */}
+                <audio ref={ringerRef} src={ringtoneUrl} loop />
+                {incomingConn && incomingRinging && (
+                  <Incoming device={device} connection={incomingConn} caller={incomingCaller} />
+                )}
               </div>
             </PrivateRoute>
           } />

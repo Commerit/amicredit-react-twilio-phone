@@ -6,7 +6,7 @@
   height: 64px;
   background: #fff;
   display: flex;
-  justify-content: space-around;
+  justify-content: space-between;
   align-items: center;
   border-top: 1px solid #e0e0e0;
   z-index: 100;
@@ -38,4 +38,31 @@
 
 .nav-label {
   font-size: 12px;
+}
+
+.nav-items {
+  display: flex;
+  flex: 1;
+  justify-content: space-around;
+  align-items: center;
+}
+
+.logout-btn {
+  position: absolute;
+  right: 24px;
+  top: -40px;
+  background: #e65c00;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 10px 20px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 2px 8px #0001;
+  transition: background 0.2s;
+}
+
+.logout-btn:hover {
+  background: #b34700;
 } 

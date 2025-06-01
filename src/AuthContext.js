@@ -46,6 +46,12 @@ export function AuthProvider({ children }) {
     if (!error) setUserProfile(data);
   }
 
+  async function logout() {
+    await supabase.auth.signOut();
+    setUser(null);
+    setUserProfile(null);
+  }
+
   const value = {
     user,
     userProfile,
@@ -53,6 +59,7 @@ export function AuthProvider({ children }) {
     supabase,
     setUser,
     setUserProfile,
+    logout,
   };
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

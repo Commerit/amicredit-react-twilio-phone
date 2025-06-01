@@ -1,5 +1,6 @@
 import React from "react";
 import "./NavigationBar.css";
+import { useAuth } from './AuthContext';
 
 const navItems = [
   { key: "dialer", label: "Dialer", icon: "\u260E\uFE0F" }, // phone emoji
@@ -8,20 +9,26 @@ const navItems = [
   { key: "settings", label: "Settings", icon: "\u2699\uFE0F" }, // gear emoji
 ];
 
-const NavigationBar = ({ active, onChange }) => (
-  <nav className="navigation-bar">
-    {navItems.map((item) => (
-      <button
-        key={item.key}
-        className={`nav-item${active === item.key ? " active" : ""}`}
-        onClick={() => onChange(item.key)}
-        aria-label={item.label}
-      >
-        <span className="nav-icon">{item.icon}</span>
-        <span className="nav-label">{item.label}</span>
-      </button>
-    ))}
-  </nav>
-);
+const NavigationBar = ({ active, onChange }) => {
+  const { logout } = useAuth();
+  return (
+    <nav className="navigation-bar">
+      <div className="nav-items">
+        {navItems.map((item) => (
+          <button
+            key={item.key}
+            className={`nav-item${active === item.key ? " active" : ""}`}
+            onClick={() => onChange(item.key)}
+            aria-label={item.label}
+          >
+            <span className="nav-icon">{item.icon}</span>
+            <span className="nav-label">{item.label}</span>
+          </button>
+        ))}
+      </div>
+      <button className="logout-btn" onClick={logout} aria-label="Log out">Log out</button>
+    </nav>
+  );
+}
 
 export default NavigationBar; 
