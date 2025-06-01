@@ -17,7 +17,6 @@ const Phone = ({ token }) => {
   const [timer, setTimer] = useState(0);
   const timerRef = useRef();
   const [isMuted, setIsMuted] = useState(false);
-  const localStreamRef = useRef(null);
 
   useEffect(() => {
     const device = new Device();
@@ -32,12 +31,16 @@ const Phone = ({ token }) => {
       setState(states.ON_CALL);
       setCallStart(Date.now());
       setRingStart(null);
+      // Listen for mute/unmute events
+      connection.on("mute", () => setIsMuted(true));
+      connection.on("unmute", () => setIsMuted(false));
     });
     device.on("disconnect", () => {
       setState(states.READY);
       setConn(null);
       setCallStart(null);
       setTimer(0);
+      setIsMuted(false);
     });
     device.on("incoming", connection => {
       setState(states.INCOMING);
@@ -97,12 +100,11 @@ const Phone = ({ token }) => {
   };
 
   const toggleMute = () => {
-    if (localStreamRef.current) {
-      const audioTracks = localStreamRef.current.getAudioTracks();
-      if (audioTracks.length > 0) {
-        const newMuteState = !isMuted;
-        audioTracks[0].enabled = !newMuteState;
-        setIsMuted(newMuteState);
+    if (conn) {
+      if (isMuted) {
+        conn.unmute();
+      } else {
+        conn.mute();
       }
     }
   };
@@ -124,6 +126,9 @@ const Phone = ({ token }) => {
           <div className="call-number">{number}</div>
           <div className="call-status">On Call {timer}s</div>
           <OnCall handleHangup={handleHangup} connection={conn} />
+          <button onClick={toggleMute} style={{ margin: '12px', padding: '10px 20px', borderRadius: 6, background: isMuted ? '#e65c00' : '#eee', color: isMuted ? '#fff' : '#222', fontWeight: 600 }}>
+            {isMuted ? 'Unmute' : 'Mute'}
+          </button>
         </div>
       );
     }
@@ -143,9 +148,7 @@ const Phone = ({ token }) => {
       </>
     );
   }
-  return <div className="phone-container">{render}<button onClick={toggleMute} style={{ margin: '12px', padding: '10px 20px', borderRadius: 6, background: isMuted ? '#e65c00' : '#eee', color: isMuted ? '#fff' : '#222', fontWeight: 600 }}>
-    {isMuted ? 'Unmute' : 'Mute'}
-  </button></div>;
+  return <div className="phone-container">{render}</div>;
 };
 
 export default Phone;
