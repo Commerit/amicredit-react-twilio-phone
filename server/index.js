@@ -211,10 +211,10 @@ app.post("/twilio/recording", async (req, res) => {
         const buffer = Buffer.from(response.data, 'binary');
         const filename = `${CallSid}.mp3`;
         // Upload to Supabase Storage
-        const { error: uploadError } = await supabase.storage
+        const { data, error } = await supabase.storage
           .from('recordings')
           .upload(filename, buffer, { contentType: 'audio/mpeg', upsert: true });
-        if (uploadError) throw uploadError;
+        if (error) throw error;
         // Manually construct the public URL
         const supabaseUrl = config.supabase.url || process.env.SUPABASE_URL;
         const manualPublicUrl = `${supabaseUrl}/storage/v1/object/public/recordings/${filename}`;
@@ -224,71 +224,67 @@ app.post("/twilio/recording", async (req, res) => {
           return res.status(500).json({ error: 'Failed to construct public URL for recording' });
         }
 
-        // Update call_logs with recording_url and set transcription_status to 'processing'
-        await supabase.from('call_logs').update({
-          recording_url: manualPublicUrl,
-          transcription_status: 'processing',
-          updated_at: new Date().toISOString()
-        }).eq('id', CallSid);
-
-        // --- Begin transcription process ---
-        try {
-          // Send to OpenAI Whisper API
-          const OpenAI = require('openai');
-          const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-          const fs = require('fs');
-          const os = require('os');
-          const path = require('path');
-          const tempFile = path.join(os.tmpdir(), filename);
-          fs.writeFileSync(tempFile, buffer);
-          const transcription = await openai.audio.transcriptions.create({
-            file: fs.createReadStream(tempFile),
-            model: 'gpt-4o-transcribe',
-            response_format: 'text',
-          });
-          console.log('OpenAI transcription response:', transcription);
-          if (!transcription || !transcription.text) {
-            console.error('Transcription failed or returned no text:', transcription);
-            await supabase.from('call_logs').update({
-              transcription_status: 'failed',
-              updated_at: new Date().toISOString()
-            }).eq('id', CallSid);
-            fs.unlinkSync(tempFile);
-            return res.status(500).json({ error: "Transcription failed or returned no text" });
+        // Try to find the call log row for this CallSid
+        let { data: callLog, error: fetchError } = await supabase
+          .from('call_logs')
+          .select('*')
+          .eq('id', CallSid)
+          .single();
+        let updatedAny = false;
+        if (callLog) {
+          const updatedLog = { ...callLog, recording_url: manualPublicUrl, updated_at: new Date().toISOString() };
+          console.log('[PARENT UPSERT] Payload:', updatedLog);
+          const result = await supabase.from('call_logs').upsert(updatedLog, { onConflict: 'id' });
+          console.log('[PARENT UPSERT] Result:', result);
+          if (result.error) {
+            console.error("Error upserting recording URL for id:", CallSid, result.error);
+            return res.status(500).json({ error: "Failed to update recording" });
           }
-          const transcriptText = transcription.text;
-          const transcriptFilename = `${CallSid}.txt`;
-          const transcriptBuffer = Buffer.from(transcriptText, 'utf-8');
-          // Upload transcript to Supabase Storage
-          const { error: transcriptUploadError } = await supabase.storage
-            .from('transcripts')
-            .upload(transcriptFilename, transcriptBuffer, { contentType: 'text/plain', upsert: true });
-          if (transcriptUploadError) throw transcriptUploadError;
-          const transcriptUrl = `${supabaseUrl}/storage/v1/object/public/transcripts/${transcriptFilename}`;
-          // Update call_logs with transcript and transcript_url
-          await supabase.from('call_logs').update({
-            transcript: transcriptText,
-            transcript_url: transcriptUrl,
-            transcription_status: 'completed',
-            updated_at: new Date().toISOString()
-          }).eq('id', CallSid);
-          fs.unlinkSync(tempFile);
-          console.log('Transcription completed and updated in call_logs.');
-        } catch (transcriptionError) {
-          console.error('Transcription failed:', transcriptionError);
-          await supabase.from('call_logs').update({
-            transcription_status: 'failed',
-            updated_at: new Date().toISOString()
-          }).eq('id', CallSid);
+          const { data: afterUpsert, error: afterUpsertError } = await supabase
+            .from('call_logs')
+            .select('*')
+            .eq('id', CallSid)
+            .single();
+          console.log('[PARENT UPSERT] Row after upsert:', afterUpsert, afterUpsertError);
+          updatedAny = true;
         }
-        // --- End transcription process ---
+        // Now update ALL children where parent_call_sid matches
+        const { data: childLogs, error: childError } = await supabase
+          .from('call_logs')
+          .select('*')
+          .eq('parent_call_sid', CallSid);
+        if (childError) {
+          console.error(`Error fetching child call logs for parent_call_sid ${CallSid}:`, childError);
+        } else if (childLogs && childLogs.length > 0) {
+          for (const child of childLogs) {
+            const updatedChild = { ...child, recording_url: manualPublicUrl, updated_at: new Date().toISOString() };
+            console.log(`[CHILD UPSERT] Payload for child id ${child.id}:`, updatedChild);
+            const upsertResult = await supabase.from('call_logs').upsert(updatedChild, { onConflict: 'id' });
+            console.log(`[CHILD UPSERT] Upsert result for child id ${child.id}:`, upsertResult);
+            if (upsertResult.error) {
+              console.error(`Error upserting recording URL for child id: ${child.id}`, upsertResult.error);
+            } else {
+              const updateResult = await supabase.from('call_logs').update({ recording_url: manualPublicUrl, updated_at: new Date().toISOString() }).eq('id', child.id);
+              console.log(`[CHILD UPDATE] Direct update result for child id ${child.id}:`, updateResult);
+              const { data: afterUpdate, error: afterUpdateError } = await supabase
+                .from('call_logs')
+                .select('*')
+                .eq('id', child.id)
+                .single();
+              console.log(`[CHILD] Row after update for child id ${child.id}:`, afterUpdate, afterUpdateError);
+              updatedAny = true;
+            }
+          }
+        } else {
+          console.log(`No child call logs found for parent_call_sid ${CallSid}`);
+        }
+        if (!updatedAny) {
+          console.warn(`No call log rows were updated for CallSid ${CallSid}.`);
+        }
+        console.log("Recording uploaded to Supabase and recording_url update process completed");
       } catch (err) {
-        console.error("Error downloading/uploading recording or during transcription:", err);
-        await supabase.from('call_logs').update({
-          transcription_status: 'failed',
-          updated_at: new Date().toISOString()
-        }).eq('id', CallSid);
-        return res.status(500).json({ error: "Failed to process recording or transcription" });
+        console.error("Error downloading/uploading recording:", err);
+        return res.status(500).json({ error: "Failed to process recording file" });
       }
     }
     res.sendStatus(200);
@@ -300,7 +296,10 @@ app.post("/twilio/recording", async (req, res) => {
 
 app.post("/twilio/transcription", async (req, res) => {
   try {
-    console.log("Transcription webhook received:", req.body);
+    console.log("Transcription webhook received:", {
+      CallSid: req.body.CallSid,
+      TranscriptionStatus: req.body.TranscriptionStatus
+    });
 
     const { CallSid, TranscriptionText } = req.body;
     let transcript = TranscriptionText;
@@ -315,7 +314,7 @@ app.post("/twilio/transcription", async (req, res) => {
       // fallback to raw string
     }
     if (CallSid && transcript) {
-      // Prepare transcript file for upload
+      // Upload transcript to Supabase Storage
       let fileBuffer, filename, contentType;
       if (isChat) {
         fileBuffer = Buffer.from(JSON.stringify(transcript, null, 2), 'utf-8');
@@ -326,28 +325,20 @@ app.post("/twilio/transcription", async (req, res) => {
         filename = `${CallSid}.txt`;
         contentType = 'text/plain';
       }
-      console.log('[TRANSCRIPT] Prepared file:', { filename, contentType, transcript });
       try {
-        // Upload to Supabase Storage
         const { data: uploadData, error: uploadError } = await supabase.storage
           .from('transcripts')
           .upload(filename, fileBuffer, { contentType, upsert: true });
-        console.log('[TRANSCRIPT] Upload result:', { uploadData, uploadError });
         if (uploadError) throw uploadError;
-        // Manually construct the public URL
-        const supabaseUrl = config.supabase.url || process.env.SUPABASE_URL;
-        const manualPublicUrl = `${supabaseUrl}/storage/v1/object/public/transcripts/${filename}`;
-        console.log('[TRANSCRIPT] Manually constructed public URL:', manualPublicUrl);
-        // Upsert transcript_url and transcript into call_logs
-        const upsertPayload = {
+        // Get public URL
+        const { publicURL } = supabase.storage.from('transcripts').getPublicUrl(filename);
+        // Update call_logs with transcript_url and transcript (for chat UI)
+        const result = await supabase.from('call_logs').upsert({
           id: CallSid,
           transcript: transcript,
-          transcript_url: manualPublicUrl,
+          transcript_url: publicURL,
           updated_at: new Date().toISOString()
-        };
-        console.log('[TRANSCRIPT] Upsert payload:', upsertPayload);
-        const result = await supabase.from('call_logs').upsert(upsertPayload, { onConflict: 'id' });
-        console.log('[TRANSCRIPT] Upsert result:', result);
+        }, { onConflict: 'id' });
         if (result.error) {
           console.error("Error upserting transcript:", result.error);
           return res.status(500).json({ error: "Failed to update transcript" });
@@ -357,8 +348,6 @@ app.post("/twilio/transcription", async (req, res) => {
         console.error("Error uploading transcript file:", err);
         return res.status(500).json({ error: "Failed to process transcript file" });
       }
-    } else {
-      console.warn('[TRANSCRIPT] Missing CallSid or transcript:', { CallSid, transcript });
     }
     res.sendStatus(200);
   } catch (error) {
