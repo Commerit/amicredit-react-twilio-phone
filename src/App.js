@@ -10,7 +10,6 @@ import Phone from "./Phone";
 import NavigationBar from "./NavigationBar";
 import { Device } from "twilio-client";
 import Incoming from "./Incoming";
-import states from "./states";
 
 function PrivateRoute({ children }) {
   const { user, loading } = useAuth();
