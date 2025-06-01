@@ -113,11 +113,13 @@ app.post("/voice/incoming", (req, res) => {
     recordingStatusCallbackEvent: "completed",
     recordingStatusCallbackMethod: "POST"
   });
-  dial.client({
+  const client = dial.client({
     statusCallbackEvent: "initiated ringing answered completed",
     statusCallback: `${baseUrl}/twilio/call-status`,
     statusCallbackMethod: "POST"
   }, "phil");
+  // Pass the real caller's number as a custom parameter
+  client.parameter({ name: "real_from", value: req.body.From });
   res.set("Content-Type", "text/xml");
   res.send(response.toString());
 });

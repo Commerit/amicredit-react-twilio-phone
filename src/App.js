@@ -52,7 +52,10 @@ const App = () => {
     });
     device.on("incoming", connection => {
       setIncomingConn(connection);
-      setIncomingCaller((connection.parameters && (connection.parameters.From || connection.parameters.Caller)) || "Unknown");
+      // Prefer real_from if present, otherwise fallback
+      const params = connection.parameters || {};
+      const realCaller = params.real_from || params.From || params.Caller || "Unknown";
+      setIncomingCaller(realCaller);
       setIncomingRinging(true);
       connection.on("reject", () => {
         setIncomingConn(null);
