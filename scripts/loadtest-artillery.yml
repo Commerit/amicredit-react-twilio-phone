@@ -1,0 +1,23 @@
+config:
+  target: "http://localhost:3001"
+  phases:
+    - duration: 60
+      arrivalRate: 20   # 20 new requests per second (adjust as needed)
+scenarios:
+  - name: Simulate Twilio call-status and recording webhooks
+    flow:
+      - post:
+          url: "/twilio/call-status"
+          json:
+            CallSid: "CA{{ $randomString(24) }}"
+            CallStatus: "completed"
+            Direction: "outbound-dial"
+            From: "+4037381{{ $randomInt(1000,9999) }}"
+            To: "+1640252{{ $randomInt(1000,9999) }}"
+      - think: 0.2
+      - post:
+          url: "/twilio/recording"
+          json:
+            CallSid: "CA{{ $lastResponse.body.CallSid || $randomString(24) }}"
+            RecordingUrl: "https://api.twilio.com/2010-04-01/Accounts/AC123/Recordings/RE{{ $randomString(32) }}"
+            RecordingStatus: "completed" 

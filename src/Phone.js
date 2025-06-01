@@ -16,6 +16,8 @@ const Phone = ({ token }) => {
   const [ringStart, setRingStart] = useState(null);
   const [timer, setTimer] = useState(0);
   const timerRef = useRef();
+  const [isMuted, setIsMuted] = useState(false);
+  const localStreamRef = useRef(null);
 
   useEffect(() => {
     const device = new Device();
@@ -94,6 +96,17 @@ const Phone = ({ token }) => {
     device.disconnectAll();
   };
 
+  const toggleMute = () => {
+    if (localStreamRef.current) {
+      const audioTracks = localStreamRef.current.getAudioTracks();
+      if (audioTracks.length > 0) {
+        const newMuteState = !isMuted;
+        audioTracks[0].enabled = !newMuteState;
+        setIsMuted(newMuteState);
+      }
+    }
+  };
+
   let render;
   if (conn) {
     if (state === states.INCOMING) {
@@ -130,7 +143,9 @@ const Phone = ({ token }) => {
       </>
     );
   }
-  return <>{render}</>;
+  return <div className="phone-container">{render}<button onClick={toggleMute} style={{ margin: '12px', padding: '10px 20px', borderRadius: 6, background: isMuted ? '#e65c00' : '#eee', color: isMuted ? '#fff' : '#222', fontWeight: 600 }}>
+    {isMuted ? 'Unmute' : 'Mute'}
+  </button></div>;
 };
 
 export default Phone;
