@@ -215,8 +215,14 @@ app.post("/twilio/recording", async (req, res) => {
           .from('recordings')
           .upload(filename, buffer, { contentType: 'audio/mpeg', upsert: true });
         if (error) throw error;
-        // Get public URL
-        const { publicURL } = supabase.storage.from('recordings').getPublicUrl(filename);
+        // Manually construct the public URL
+        const supabaseUrl = config.supabase.url || process.env.SUPABASE_URL;
+        const manualPublicUrl = `${supabaseUrl}/storage/v1/object/public/recordings/${filename}`;
+        console.log('Manually constructed public URL:', manualPublicUrl);
+        if (!manualPublicUrl || !manualPublicUrl.startsWith('http') || !filename) {
+          console.error('Failed to construct manual public URL for recording:', filename);
+          return res.status(500).json({ error: 'Failed to construct public URL for recording' });
+        }
 
         // Try to find the call log row for this CallSid
         let { data: callLog, error: fetchError } = await supabase
@@ -226,8 +232,7 @@ app.post("/twilio/recording", async (req, res) => {
           .single();
         let updatedAny = false;
         if (callLog) {
-          // Upsert with all existing fields, just updating recording_url and updated_at
-          const updatedLog = { ...callLog, recording_url: publicURL, updated_at: new Date().toISOString() };
+          const updatedLog = { ...callLog, recording_url: manualPublicUrl, updated_at: new Date().toISOString() };
           console.log('[PARENT UPSERT] Payload:', updatedLog);
           const result = await supabase.from('call_logs').upsert(updatedLog, { onConflict: 'id' });
           console.log('[PARENT UPSERT] Result:', result);
@@ -235,7 +240,6 @@ app.post("/twilio/recording", async (req, res) => {
             console.error("Error upserting recording URL for id:", CallSid, result.error);
             return res.status(500).json({ error: "Failed to update recording" });
           }
-          // Fetch and log the row after upsert
           const { data: afterUpsert, error: afterUpsertError } = await supabase
             .from('call_logs')
             .select('*')
@@ -253,17 +257,15 @@ app.post("/twilio/recording", async (req, res) => {
           console.error(`Error fetching child call logs for parent_call_sid ${CallSid}:`, childError);
         } else if (childLogs && childLogs.length > 0) {
           for (const child of childLogs) {
-            const updatedChild = { ...child, recording_url: publicURL, updated_at: new Date().toISOString() };
+            const updatedChild = { ...child, recording_url: manualPublicUrl, updated_at: new Date().toISOString() };
             console.log(`[CHILD UPSERT] Payload for child id ${child.id}:`, updatedChild);
             const upsertResult = await supabase.from('call_logs').upsert(updatedChild, { onConflict: 'id' });
             console.log(`[CHILD UPSERT] Upsert result for child id ${child.id}:`, upsertResult);
             if (upsertResult.error) {
               console.error(`Error upserting recording URL for child id: ${child.id}`, upsertResult.error);
             } else {
-              // Try a direct update as well
-              const updateResult = await supabase.from('call_logs').update({ recording_url: publicURL, updated_at: new Date().toISOString() }).eq('id', child.id);
+              const updateResult = await supabase.from('call_logs').update({ recording_url: manualPublicUrl, updated_at: new Date().toISOString() }).eq('id', child.id);
               console.log(`[CHILD UPDATE] Direct update result for child id ${child.id}:`, updateResult);
-              // Fetch and log the row after update
               const { data: afterUpdate, error: afterUpdateError } = await supabase
                 .from('call_logs')
                 .select('*')
