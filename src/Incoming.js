@@ -3,7 +3,7 @@ import "./Incoming.css";
 
 const ringtoneUrl = "https://actions.google.com/sounds/v1/alarms/phone_alerts_and_rings.ogg";
 
-const Incoming = ({ connection, device, caller }) => {
+const Incoming = ({ connection, device, caller, onClear }) => {
   const audioRef = useRef();
 
   useEffect(() => {
@@ -21,9 +21,11 @@ const Incoming = ({ connection, device, caller }) => {
 
   const acceptConnection = () => {
     connection.accept();
+    if (onClear) onClear();
   };
   const rejectConnection = () => {
     connection.reject();
+    if (onClear) onClear();
   };
   return (
     <div className="incoming-overlay">

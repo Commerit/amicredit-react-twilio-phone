@@ -122,6 +122,12 @@ const App = () => {
       .then(({ token }) => setToken(token));
   };
 
+  // Handler to clear incoming state (stop modal/ringer)
+  const clearIncoming = () => {
+    setIncomingConn(null);
+    setIncomingRinging(false);
+  };
+
   let mainContent;
   if (activeSection === "dialer") {
     mainContent = !clicked ? (
@@ -154,7 +160,7 @@ const App = () => {
                 {/* Global ringer audio */}
                 <audio ref={ringerRef} src={ringtoneUrl} loop />
                 {incomingConn && incomingRinging && (
-                  <Incoming device={device} connection={incomingConn} caller={incomingCaller} />
+                  <Incoming device={device} connection={incomingConn} caller={incomingCaller} onClear={clearIncoming} />
                 )}
               </div>
             </PrivateRoute>
