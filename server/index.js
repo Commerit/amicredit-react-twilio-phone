@@ -217,12 +217,32 @@ app.post("/twilio/recording", async (req, res) => {
         if (error) throw error;
         // Get public URL
         const { publicURL } = supabase.storage.from('recordings').getPublicUrl(filename);
-        // Update call_logs with public URL
-        const result = await supabase.from('call_logs').upsert({
-          id: CallSid,
-          recording_url: publicURL,
-          updated_at: new Date().toISOString()
-        }, { onConflict: 'id' });
+
+        // Try to find the call log row for this CallSid
+        let { data: callLog, error: fetchError } = await supabase
+          .from('call_logs')
+          .select('*')
+          .eq('id', CallSid)
+          .single();
+        let updateId = CallSid;
+        if (fetchError || !callLog) {
+          // If not found, try to find a child call log where parent_call_sid matches
+          const { data: childLogs, error: childError } = await supabase
+            .from('call_logs')
+            .select('*')
+            .eq('parent_call_sid', CallSid)
+            .limit(1);
+          if (!childError && childLogs && childLogs.length > 0) {
+            callLog = childLogs[0];
+            updateId = callLog.id;
+          } else {
+            console.warn(`No call log found for CallSid ${CallSid} or as parent_call_sid. Skipping recording_url update.`);
+            return res.status(200).json({ warning: "No call log found to update recording_url." });
+          }
+        }
+        // Upsert with all existing fields, just updating recording_url and updated_at
+        const updatedLog = { ...callLog, recording_url: publicURL, updated_at: new Date().toISOString() };
+        const result = await supabase.from('call_logs').upsert(updatedLog, { onConflict: 'id' });
         if (result.error) {
           console.error("Error upserting recording URL:", result.error);
           return res.status(500).json({ error: "Failed to update recording" });
