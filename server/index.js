@@ -246,6 +246,16 @@ app.post("/twilio/recording", async (req, res) => {
             model: 'gpt-4o-transcribe',
             response_format: 'text',
           });
+          console.log('OpenAI transcription response:', transcription);
+          if (!transcription || !transcription.text) {
+            console.error('Transcription failed or returned no text:', transcription);
+            await supabase.from('call_logs').update({
+              transcription_status: 'failed',
+              updated_at: new Date().toISOString()
+            }).eq('id', CallSid);
+            fs.unlinkSync(tempFile);
+            return res.status(500).json({ error: "Transcription failed or returned no text" });
+          }
           const transcriptText = transcription.text;
           const transcriptFilename = `${CallSid}.txt`;
           const transcriptBuffer = Buffer.from(transcriptText, 'utf-8');
