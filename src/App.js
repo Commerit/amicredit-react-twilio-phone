@@ -1,8 +1,19 @@
-import React, { useState } from "react";
+import React from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider, useAuth } from './AuthContext';
+import Login from './Login';
+import Signup from './Signup';
+import ForgotPassword from './ForgotPassword';
+import Activity from './Activity';
 import "./App.css";
 import Phone from "./Phone";
 import NavigationBar from "./NavigationBar";
-import Activity from "./Activity";
+
+function PrivateRoute({ children }) {
+  const { user, loading } = useAuth();
+  if (loading) return <div>Loading...</div>;
+  return user ? children : <Navigate to="/login" replace />;
+}
 
 const Placeholder = ({ label }) => (
   <div className="placeholder">
@@ -42,10 +53,23 @@ const App = () => {
   }
 
   return (
-    <div className="app">
-      <main className="main-content">{mainContent}</main>
-      <NavigationBar active={activeSection} onChange={setActiveSection} />
-    </div>
+    <AuthProvider>
+      <Router>
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route path="/signup" element={<Signup />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/" element={
+            <PrivateRoute>
+              <div className="app">
+                <main className="main-content">{mainContent}</main>
+                <NavigationBar active={activeSection} onChange={setActiveSection} />
+              </div>
+            </PrivateRoute>
+          } />
+        </Routes>
+      </Router>
+    </AuthProvider>
   );
 };
 

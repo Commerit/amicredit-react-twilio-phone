@@ -383,6 +383,40 @@ app.get("/api/calls/:id", async (req, res) => {
   res.json(data);
 });
 
+// TEMPORARY: Seed initial agent endpoint (remove after use)
+app.post('/api/seed-initial-agent', async (req, res) => {
+  const email = 'contact@commerit.com';
+  const password = 'Commerit1!';
+  const twilio_phone_number = '+40373812019';
+  try {
+    // 1. Create Supabase Auth user
+    const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true
+    });
+    if (authError) {
+      console.error('Error creating Supabase Auth user:', authError);
+      return res.status(500).json({ error: 'Failed to create Supabase Auth user', details: authError });
+    }
+    const userId = authUser.user.id;
+    // 2. Insert into users table
+    const { data: userRow, error: userError } = await supabase
+      .from('users')
+      .insert({ id: userId, email, twilio_phone_number })
+      .single();
+    if (userError) {
+      console.error('Error inserting into users table:', userError);
+      return res.status(500).json({ error: 'Failed to insert into users table', details: userError });
+    }
+    console.log('Seeded initial agent:', userRow);
+    res.json({ success: true, user: userRow });
+  } catch (err) {
+    console.error('Exception in seeding initial agent:', err);
+    res.status(500).json({ error: 'Exception in seeding initial agent', details: err });
+  }
+});
+
 // Catch-all handler to serve React's index.html for any other requests (client-side routing)
 app.get("*", (req, res) => {
   res.sendFile(path.join(__dirname, "../build", "index.html"));
