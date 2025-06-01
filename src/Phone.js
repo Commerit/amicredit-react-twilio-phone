@@ -31,9 +31,7 @@ const Phone = ({ token }) => {
       setState(states.ON_CALL);
       setCallStart(Date.now());
       setRingStart(null);
-      // Listen for mute/unmute events
-      connection.on("mute", () => setIsMuted(true));
-      connection.on("unmute", () => setIsMuted(false));
+      // No need to listen for mute/unmute events for button state
     });
     device.on("disconnect", () => {
       setState(states.READY);
@@ -102,9 +100,11 @@ const Phone = ({ token }) => {
   const toggleMute = () => {
     if (conn) {
       if (isMuted) {
-        conn.unmute();
+        conn.mute(false); // Unmute
+        setIsMuted(false);
       } else {
-        conn.mute();
+        conn.mute(true); // Mute
+        setIsMuted(true);
       }
     }
   };
