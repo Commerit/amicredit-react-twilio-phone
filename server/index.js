@@ -146,10 +146,46 @@ app.post("/twilio/call-status", async (req, res) => {
     // Try to get userId from custom header or parameter (for outbound)
     const userId = req.headers['x-user-id'] || req.body.user_id || null;
     const { CallSid, CallStatus, From, To, Direction, Timestamp, StartTime, EndTime, Duration, CallDuration, RecordingDuration, ParentCallSid } = req.body;
-    // Determine call direction
-    let callDirection = Direction || '';
-    if (!callDirection && req.body.Caller && req.body.Called) {
-      callDirection = 'outbound-dial';
+    // Find user and team
+    let user = null, team = null, teamPhone = null;
+    if (userId) {
+      user = await findUserByIdOrNumber(userId);
+      if (user && user.team_id) {
+        team = { id: user.team_id };
+        // Fetch team phone number
+        const { data: teamRow } = await supabase.from('teams').select('phone_number').eq('id', user.team_id).single();
+        if (teamRow) teamPhone = teamRow.phone_number;
+      }
+    }
+    // If no team yet, try to find by To or From number
+    if (!teamPhone) {
+      // Try to match To number
+      const { data: teamByTo } = await supabase.from('teams').select('id, phone_number').eq('phone_number', To).single();
+      if (teamByTo) {
+        team = { id: teamByTo.id };
+        teamPhone = teamByTo.phone_number;
+      }
+    }
+    if (!teamPhone) {
+      // Try to match From number
+      const { data: teamByFrom } = await supabase.from('teams').select('id, phone_number').eq('phone_number', From).single();
+      if (teamByFrom) {
+        team = { id: teamByFrom.id };
+        teamPhone = teamByFrom.phone_number;
+      }
+    }
+    // Classify direction
+    let callDirection = 'unknown';
+    if (teamPhone) {
+      if (From === teamPhone) {
+        callDirection = 'outbound';
+      } else if (To === teamPhone) {
+        callDirection = 'inbound';
+      }
+    }
+    if (callDirection === 'unknown') {
+      // Fallback to Twilio's Direction or 'unknown'
+      callDirection = Direction || 'unknown';
     }
     // Map Twilio statuses
     let internalStatus = CallStatus;
@@ -164,17 +200,6 @@ app.post("/twilio/call-status", async (req, res) => {
     else if (RecordingDuration) durationSeconds = parseInt(RecordingDuration);
     else if (Duration) durationSeconds = parseInt(Duration);
     else if (StartTime && EndTime) durationSeconds = Math.floor((new Date(EndTime) - new Date(StartTime)) / 1000);
-    // Find user and team
-    let user = null, team = null;
-    if (callDirection === 'outbound-dial') {
-      user = await findUserByIdOrNumber(userId);
-      if (user && user.team_id) {
-        team = { id: user.team_id };
-      }
-    } else {
-      // Inbound: find team by To number
-      team = await findTeamByNumber(To);
-    }
     // For answered inbound, try to get user who answered (if available)
     if (!user && req.body.answered_by_user_id) {
       user = await findUserByIdOrNumber(req.body.answered_by_user_id);

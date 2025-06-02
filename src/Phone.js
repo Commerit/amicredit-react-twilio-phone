@@ -6,6 +6,7 @@ import Incoming from "./Incoming";
 import OnCall from "./OnCall";
 import "./Phone.css";
 import states from "./states";
+import { useAuth } from "./AuthContext";
 
 const Phone = ({ token, initialNumber = "", setNumberInUrl }) => {
   const [state, setState] = useState(states.CONNECTING);
@@ -17,6 +18,7 @@ const Phone = ({ token, initialNumber = "", setNumberInUrl }) => {
   const [timer, setTimer] = useState(0);
   const timerRef = useRef();
   const [isMuted, setIsMuted] = useState(false);
+  const { user } = useAuth();
 
   useEffect(() => {
     setNumber(initialNumber);
@@ -96,8 +98,8 @@ const Phone = ({ token, initialNumber = "", setNumberInUrl }) => {
   }, [state, callStart, ringStart]);
 
   const handleCall = () => {
-    if (device && number && /^\+\d{8,15}$/.test(number)) {
-      device.connect({ To: number });
+    if (device && number && /^\+\d{8,15}$/.test(number) && user) {
+      device.connect({ To: number, user_id: user.id });
     }
   };
 
