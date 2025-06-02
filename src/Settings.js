@@ -34,36 +34,31 @@ export default function Settings() {
     let newAvatarUrl = avatarUrl;
     // Upload avatar if changed
     if (avatarFile) {
-<<<<<<< HEAD
-      const formData = new FormData();
-      formData.append('avatar', avatarFile);
-      formData.append('userId', user.id);
+      const fileExt = avatarFile.name.split('.').pop();
+      const filePath = `avatars/${user.id}.${fileExt}`;
       try {
-        const response = await fetch('/api/upload-avatar', {
-          method: 'POST',
-          body: formData,
-        });
-        const result = await response.json();
-        if (!response.ok) {
-          setError("Failed to upload avatar: " + (result.error || 'Unknown error'));
+        const { error: uploadError } = await supabase.storage.from('avatars').upload(filePath, avatarFile, { upsert: true });
+        if (uploadError) {
+          if (uploadError.message && uploadError.message.includes('bucket')) {
+            setError("Avatar upload failed: Storage bucket 'avatars' does not exist or is misconfigured. Please create a public 'avatars' bucket in Supabase Storage.");
+          } else {
+            setError("Failed to upload avatar: " + uploadError.message);
+          }
           setLoading(false);
           return;
         }
-        newAvatarUrl = result.avatar_url || newAvatarUrl;
+        const { data: publicUrlData, error: publicUrlError } = supabase.storage.from('avatars').getPublicUrl(filePath);
+        if (publicUrlError) {
+          setError("Failed to get public URL for avatar: " + publicUrlError.message);
+          setLoading(false);
+          return;
+        }
+        newAvatarUrl = publicUrlData?.publicUrl || newAvatarUrl;
       } catch (err) {
         setError("Unexpected error uploading avatar: " + (err.message || err));
-=======
-      const fileExt = avatarFile.name.split('.').pop();
-      const filePath = `avatars/${user.id}.${fileExt}`;
-      const { error: uploadError } = await supabase.storage.from('avatars').upload(filePath, avatarFile, { upsert: true });
-      if (uploadError) {
-        setError("Failed to upload avatar.");
->>>>>>> parent of 37039ae (.)
         setLoading(false);
         return;
       }
-      const { data: publicUrlData } = supabase.storage.from('avatars').getPublicUrl(filePath);
-      newAvatarUrl = publicUrlData?.publicUrl || newAvatarUrl;
     }
     // Update user profile
     const { error: updateError, data: updatedProfile } = await supabase
@@ -73,23 +68,39 @@ export default function Settings() {
       .select()
       .single();
     if (updateError) {
-      setError("Failed to update profile.");
+      setError("Failed to update profile: " + updateError.message);
       setLoading(false);
       return;
     }
     setUserProfile(updatedProfile);
     // Change password if requested
-    if (currentPassword && newPassword && newPassword === confirmPassword) {
-      const { error: pwError } = await supabase.auth.updateUser({ password: newPassword });
-      if (pwError) {
-        setError("Failed to update password: " + pwError.message);
+    if (currentPassword || newPassword || confirmPassword) {
+      if (!currentPassword || !newPassword || !confirmPassword) {
+        setError("Please fill in all password fields to change your password.");
         setLoading(false);
         return;
       }
-    } else if (newPassword || confirmPassword) {
-      setError("Passwords do not match or are incomplete.");
-      setLoading(false);
-      return;
+      if (newPassword !== confirmPassword) {
+        setError("Passwords do not match.");
+        setLoading(false);
+        return;
+      }
+      try {
+        const { error: pwError } = await supabase.auth.updateUser({ password: newPassword });
+        if (pwError) {
+          if (pwError.message && (pwError.message.toLowerCase().includes('reauth') || pwError.message.toLowerCase().includes('token'))) {
+            setError("Password change failed: Please log out and log in again, then try changing your password.");
+          } else {
+            setError("Failed to update password: " + pwError.message);
+          }
+          setLoading(false);
+          return;
+        }
+      } catch (err) {
+        setError("Unexpected error updating password: " + (err.message || err));
+        setLoading(false);
+        return;
+      }
     }
     setSuccess("Profile updated successfully.");
     setLoading(false);
