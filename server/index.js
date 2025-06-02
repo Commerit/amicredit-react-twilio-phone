@@ -8,6 +8,7 @@ const path = require("path");
 const { createClient } = require('@supabase/supabase-js');
 const axios = require('axios');
 const multer = require('multer');
+const { v4: uuidv4 } = require('uuid');
 
 const app = express();
 app.use(bodyParser.urlencoded({ extended: false }));
@@ -396,7 +397,8 @@ app.post('/api/upload-avatar', upload.single('avatar'), async (req, res) => {
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
     const file = req.file;
     const ext = (file.originalname.split('.').pop() || 'png').toLowerCase();
-    const filePath = `avatars/${userId}.${ext}`;
+    const uuid = uuidv4();
+    const filePath = `avatars/${uuid}.${ext}`;
     // Upload to Supabase Storage
     const { data, error: uploadError } = await supabase.storage.from('avatars').upload(filePath, file.buffer, {
       contentType: file.mimetype,
@@ -407,7 +409,7 @@ app.post('/api/upload-avatar', upload.single('avatar'), async (req, res) => {
     }
     // Use the actual path returned by Supabase
     const supabaseUrl = config.supabase.url || process.env.SUPABASE_URL;
-    const uploadedPath = data?.path || filePath; // fallback for older SDKs
+    const uploadedPath = data?.path || filePath;
     const publicUrl = `${supabaseUrl}/storage/v1/object/public/${uploadedPath}`;
     // Update users table
     const { error: updateError } = await supabase.from('users').update({ avatar_url: publicUrl }).eq('id', userId);
