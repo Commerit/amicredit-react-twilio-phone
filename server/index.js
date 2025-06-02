@@ -124,47 +124,63 @@ app.post("/voice/incoming", (req, res) => {
   res.send(response.toString());
 });
 
+// Helper: Find user by ID only (no phone number)
+async function findUserByIdOrNumber(userId) {
+  if (userId) {
+    const { data: user, error } = await supabase.from('users').select('*').eq('id', userId).single();
+    if (user) return user;
+  }
+  return null;
+}
+
+// Helper: Find team by phone number
+async function findTeamByNumber(phoneNumber) {
+  if (!phoneNumber) return null;
+  const { data: team, error } = await supabase.from('teams').select('*').eq('phone_number', phoneNumber).single();
+  return team || null;
+}
+
 // Webhook endpoints for Twilio events
 app.post("/twilio/call-status", async (req, res) => {
   try {
-    console.log("Call status webhook received:", {
-      CallSid: req.body.CallSid,
-      CallStatus: req.body.CallStatus,
-      Direction: req.body.Direction,
-      From: req.body.From,
-      To: req.body.To
-    });
-
+    // Try to get userId from custom header or parameter (for outbound)
+    const userId = req.headers['x-user-id'] || req.body.user_id || null;
     const { CallSid, CallStatus, From, To, Direction, Timestamp, StartTime, EndTime, Duration, CallDuration, RecordingDuration, ParentCallSid } = req.body;
-    
-    // Determine call direction based on webhook data
+    // Determine call direction
     let callDirection = Direction || '';
     if (!callDirection && req.body.Caller && req.body.Called) {
-      // For outbound calls from the client
       callDirection = 'outbound-dial';
     }
-    
-    // Map Twilio statuses to our internal statuses
+    // Map Twilio statuses
     let internalStatus = CallStatus;
     if (CallStatus === 'busy' || CallStatus === 'no-answer' || CallStatus === 'failed') {
       internalStatus = 'missed';
     } else if (CallStatus === 'completed') {
       internalStatus = 'completed';
     }
-
-    // Calculate duration
+    // Duration
     let durationSeconds = null;
-    if (CallDuration) {
-      durationSeconds = parseInt(CallDuration);
-    } else if (RecordingDuration) {
-      durationSeconds = parseInt(RecordingDuration);
-    } else if (Duration) {
-      durationSeconds = parseInt(Duration);
-    } else if (StartTime && EndTime) {
-      durationSeconds = Math.floor((new Date(EndTime) - new Date(StartTime)) / 1000);
+    if (CallDuration) durationSeconds = parseInt(CallDuration);
+    else if (RecordingDuration) durationSeconds = parseInt(RecordingDuration);
+    else if (Duration) durationSeconds = parseInt(Duration);
+    else if (StartTime && EndTime) durationSeconds = Math.floor((new Date(EndTime) - new Date(StartTime)) / 1000);
+    // Find user and team
+    let user = null, team = null;
+    if (callDirection === 'outbound-dial') {
+      user = await findUserByIdOrNumber(userId);
+      if (user && user.team_id) {
+        team = { id: user.team_id };
+      }
+    } else {
+      // Inbound: find team by To number
+      team = await findTeamByNumber(To);
     }
-
-    const result = await supabase.from('call_logs').upsert({
+    // For answered inbound, try to get user who answered (if available)
+    if (!user && req.body.answered_by_user_id) {
+      user = await findUserByIdOrNumber(req.body.answered_by_user_id);
+    }
+    // For missed calls, user is null
+    const upsertData = {
       id: CallSid,
       parent_call_sid: ParentCallSid || null,
       direction: callDirection,
@@ -174,15 +190,16 @@ app.post("/twilio/call-status", async (req, res) => {
       ended_at: EndTime || (CallStatus === 'completed' ? new Date().toISOString() : null),
       duration_seconds: durationSeconds,
       status: internalStatus,
-      updated_at: new Date().toISOString()
-    }, { onConflict: 'id' });
-
+      updated_at: new Date().toISOString(),
+      team_id: team ? team.id : null,
+      user_id: (internalStatus === 'missed') ? null : (user ? user.id : null)
+    };
+    const result = await supabase.from('call_logs').upsert(upsertData, { onConflict: 'id' });
     if (result.error) {
       console.error("Error upserting call log:", result.error);
       return res.status(500).json({ error: "Failed to log call" });
     }
-
-    console.log("Call log upserted successfully");
+    console.log("Call log upserted successfully", upsertData);
     res.sendStatus(200);
   } catch (error) {
     console.error("Exception in call-status webhook:", error);
@@ -389,7 +406,6 @@ app.get("/api/calls/:id", async (req, res) => {
 app.post('/api/seed-initial-agent', async (req, res) => {
   const email = 'contact@commerit.com';
   const password = 'Commerit1!';
-  const twilio_phone_number = '+40373812019';
   try {
     // 1. Create Supabase Auth user
     const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
@@ -402,10 +418,10 @@ app.post('/api/seed-initial-agent', async (req, res) => {
       return res.status(500).json({ error: 'Failed to create Supabase Auth user', details: authError });
     }
     const userId = authUser.user.id;
-    // 2. Insert into users table
+    // 2. Insert into users table (no phone number)
     const { data: userRow, error: userError } = await supabase
       .from('users')
-      .insert({ id: userId, email, twilio_phone_number })
+      .insert({ id: userId, email })
       .single();
     if (userError) {
       console.error('Error inserting into users table:', userError);

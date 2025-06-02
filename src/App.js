@@ -16,11 +16,26 @@ import Settings from "./Settings";
 function Contacts() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [search, setSearch] = useState(searchParams.get("search") || "");
-  // Placeholder: Replace with real contacts fetch/filter logic
-  const contacts = [];
+  const { userProfile, supabase } = useAuth();
+  const [contacts, setContacts] = useState([]);
+  const [loading, setLoading] = useState(true);
   useEffect(() => {
     setSearchParams(search ? { search } : {});
   }, [search, setSearchParams]);
+  useEffect(() => {
+    async function fetchContacts() {
+      if (!userProfile) return;
+      setLoading(true);
+      let query = supabase.from('users').select('id, full_name, email').eq('team_id', userProfile.team_id);
+      if (search) {
+        query = query.or(`full_name.ilike.%${search}%,email.ilike.%${search}%`);
+      }
+      const { data, error } = await query;
+      setContacts(error ? [] : data || []);
+      setLoading(false);
+    }
+    fetchContacts();
+  }, [userProfile, supabase, search]);
   return (
     <div style={{ maxWidth: 800, margin: '0 auto', padding: 24 }}>
       <h2>Contacts</h2>
@@ -31,9 +46,20 @@ function Contacts() {
         onChange={e => setSearch(e.target.value)}
         style={{ width: '100%', padding: 12, borderRadius: 6, border: '1.5px solid #eee', fontSize: 16, marginBottom: 24 }}
       />
-      <div style={{ color: '#888', fontSize: 15 }}>
-        {contacts.length === 0 ? 'No contacts found.' : 'Contacts list here.'}
-      </div>
+      {loading ? (
+        <div style={{ color: '#888', fontSize: 15 }}>Loading contacts...</div>
+      ) : contacts.length === 0 ? (
+        <div style={{ color: '#888', fontSize: 15 }}>No contacts found.</div>
+      ) : (
+        <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+          {contacts.map(contact => (
+            <li key={contact.id} style={{ padding: '12px 0', borderBottom: '1px solid #eee' }}>
+              <div style={{ fontWeight: 600 }}>{contact.full_name}</div>
+              <div style={{ color: '#555', fontSize: 15 }}>{contact.email}</div>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }
@@ -46,6 +72,9 @@ function Analytics() {
     end: searchParams.get("end") || "",
     type: searchParams.get("type") || "",
   });
+  const { userProfile, supabase } = useAuth();
+  const [stats, setStats] = useState({ inbound: 0, outbound: 0, missed: 0 });
+  const [loading, setLoading] = useState(true);
   useEffect(() => {
     const params = {};
     if (filters.start) params.start = filters.start;
@@ -53,6 +82,28 @@ function Analytics() {
     if (filters.type) params.type = filters.type;
     setSearchParams(params);
   }, [filters, setSearchParams]);
+  useEffect(() => {
+    async function fetchStats() {
+      if (!userProfile) return;
+      setLoading(true);
+      let query = supabase.from('call_logs').select('*');
+      query = query.or(`user_id.eq.${userProfile.id},and(user_id.is.null,team_id.eq.${userProfile.team_id},status.eq.missed)`);
+      if (filters.start) query = query.gte('started_at', filters.start);
+      if (filters.end) query = query.lte('started_at', filters.end);
+      const { data, error } = await query;
+      if (error || !data) {
+        setStats({ inbound: 0, outbound: 0, missed: 0 });
+        setLoading(false);
+        return;
+      }
+      const inbound = data.filter(c => c.direction === 'inbound' && c.status !== 'missed').length;
+      const outbound = data.filter(c => c.direction === 'outbound' && c.status !== 'missed').length;
+      const missed = data.filter(c => c.status === 'missed').length;
+      setStats({ inbound, outbound, missed });
+      setLoading(false);
+    }
+    fetchStats();
+  }, [filters, userProfile, supabase]);
   return (
     <div style={{ maxWidth: 800, margin: '0 auto', padding: 24 }}>
       <h2>Analytics</h2>
@@ -69,20 +120,16 @@ function Analytics() {
           onChange={e => setFilters(f => ({ ...f, end: e.target.value }))}
           style={{ padding: 8, borderRadius: 6, border: '1.5px solid #eee', fontSize: 16 }}
         />
-        <select
-          value={filters.type}
-          onChange={e => setFilters(f => ({ ...f, type: e.target.value }))}
-          style={{ padding: 8, borderRadius: 6, border: '1.5px solid #eee', fontSize: 16 }}
-        >
-          <option value="">All Types</option>
-          <option value="inbound">Inbound</option>
-          <option value="outbound">Outbound</option>
-          <option value="missed">Missed</option>
-        </select>
       </div>
-      <div style={{ color: '#888', fontSize: 15 }}>
-        Analytics data and charts will appear here.
-      </div>
+      {loading ? (
+        <div style={{ color: '#888', fontSize: 15 }}>Loading analytics...</div>
+      ) : (
+        <div style={{ color: '#222', fontSize: 18, display: 'flex', gap: 32 }}>
+          <div><strong>Inbound:</strong> {stats.inbound}</div>
+          <div><strong>Outbound:</strong> {stats.outbound}</div>
+          <div><strong>Missed:</strong> {stats.missed}</div>
+        </div>
+      )}
     </div>
   );
 }

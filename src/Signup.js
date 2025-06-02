@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from './AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
 
@@ -8,10 +8,30 @@ export default function Signup() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [twilioPhone, setTwilioPhone] = useState('');
+  const [teamId, setTeamId] = useState('');
+  const [teams, setTeams] = useState([]);
+  const [teamsLoading, setTeamsLoading] = useState(true);
+  const [teamsError, setTeamsError] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    async function fetchTeams() {
+      setTeamsLoading(true);
+      setTeamsError('');
+      try {
+        const { data, error } = await supabase.from('teams').select('id, name');
+        if (error) throw error;
+        setTeams(data || []);
+      } catch (err) {
+        setTeamsError('Failed to load teams');
+      } finally {
+        setTeamsLoading(false);
+      }
+    }
+    fetchTeams();
+  }, [supabase]);
 
   const handleSignup = async (e) => {
     e.preventDefault();
@@ -28,8 +48,8 @@ export default function Signup() {
       setError("Password didn't match");
       return;
     }
-    if (!twilioPhone.match(/^\+\d{10,15}$/)) {
-      setError('Invalid phone number format');
+    if (!teamId) {
+      setError('Please select a team');
       return;
     }
     setLoading(true);
@@ -50,7 +70,7 @@ export default function Signup() {
     // 2. Insert into users table
     const { data: userData, error: userError } = await supabase
       .from('users')
-      .insert({ id: user.id, email, full_name: fullName, twilio_phone_number: twilioPhone, role: 'agent' })
+      .insert({ id: user.id, email, full_name: fullName, team_id: teamId, role: 'agent' })
       .single();
     if (userError) {
       setError(userError.message);
@@ -115,16 +135,24 @@ export default function Signup() {
           {error && password !== confirmPassword && <span style={{ color: '#e74c3c', fontSize: 13 }}>Password didn&apos;t match</span>}
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <label style={{ fontWeight: 500 }}>Twilio Phone Number</label>
-          <input
-            type="text"
-            value={twilioPhone}
-            onChange={e => setTwilioPhone(e.target.value)}
-            placeholder="e.g. +12345678901"
-            style={{ padding: 10, borderRadius: 6, border: error && !twilioPhone.match(/^\+\d{10,15}$/) ? '1.5px solid #e74c3c' : '1.5px solid #eee', outline: 'none', fontSize: 16 }}
-            required
-          />
-          {error && !twilioPhone.match(/^\+\d{10,15}$/) && <span style={{ color: '#e74c3c', fontSize: 13 }}>Invalid phone number format</span>}
+          <label style={{ fontWeight: 500 }}>Select Team</label>
+          {teamsLoading ? (
+            <div style={{ color: '#888', fontSize: 14 }}>Loading teams...</div>
+          ) : teamsError ? (
+            <div style={{ color: '#e74c3c', fontSize: 14 }}>{teamsError}</div>
+          ) : (
+            <select
+              value={teamId}
+              onChange={e => setTeamId(e.target.value)}
+              style={{ padding: 10, borderRadius: 6, border: '1.5px solid #eee', outline: 'none', fontSize: 16 }}
+              required
+            >
+              <option value="">Select a team</option>
+              {teams.map(team => (
+                <option key={team.id} value={team.id}>{team.name}</option>
+              ))}
+            </select>
+          )}
         </div>
         {error && <div style={{ color: '#e74c3c', fontSize: 15, marginTop: -8 }}>{error}</div>}
         <button type="submit" disabled={loading} style={{ background: '#e65c00', color: '#fff', border: 'none', borderRadius: 6, padding: '12px 0', fontSize: 17, fontWeight: 600, cursor: 'pointer', marginBottom: 8, opacity: loading ? 0.7 : 1 }}>

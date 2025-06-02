@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useSearchParams, useParams, useNavigate } from "react-router-dom";
+import { useAuth } from "./AuthContext";
 import "./Activity.css";
 import CallDetails from "./CallDetails";
 
@@ -7,6 +8,7 @@ const Activity = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const { userId } = useParams();
   const navigate = useNavigate();
+  const { userProfile, supabase } = useAuth();
   // Initialize filters from URL
   const [filters, setFilters] = useState({
     direction: searchParams.get("direction") || "",
@@ -30,31 +32,36 @@ const Activity = () => {
     setSearchParams(params);
   }, [filters, selectedCallId, setSearchParams]);
 
-  // Fetch calls when filters change
+  // Fetch calls for this user and their team (missed)
   const fetchCalls = useCallback(async (silent = false) => {
+    if (!userProfile) return;
     if (!silent) setLoading(true);
     try {
-      const params = new URLSearchParams();
+      // Build query for user calls and missed team calls
+      let query = supabase.from('call_logs').select('*');
+      // Only show calls for this user or missed calls for their team
+      query = query.or(`user_id.eq.${userProfile.id},and(user_id.is.null,team_id.eq.${userProfile.team_id},status.eq.missed)`);
+      // Apply filters
       if (filters.direction === "missed") {
-        params.append("status", "missed");
+        query = query.eq("status", "missed");
       } else if (filters.direction) {
-        params.append("direction", filters.direction);
+        query = query.eq("direction", filters.direction);
       }
-      if (filters.search) params.append("search", filters.search);
-      if (filters.startDate) params.append("start", filters.startDate);
-      if (filters.endDate) params.append("end", filters.endDate);
-      params.append("limit", "50");
-
-      const response = await fetch(`/api/calls?${params}`);
-      const data = await response.json();
-      setCalls(data || []);
+      if (filters.search) {
+        query = query.or(`from_number.ilike.%${filters.search}%,to_number.ilike.%${filters.search}%`);
+      }
+      if (filters.startDate) query = query.gte("started_at", filters.startDate);
+      if (filters.endDate) query = query.lte("started_at", filters.endDate);
+      query = query.order('started_at', { ascending: false }).limit(50);
+      const { data, error } = await query;
+      setCalls(error ? [] : data || []);
     } catch (error) {
       console.error("Error fetching calls:", error);
       setCalls([]);
     } finally {
       if (!silent) setLoading(false);
     }
-  }, [filters]);
+  }, [filters, userProfile, supabase]);
 
   useEffect(() => {
     fetchCalls();
@@ -158,6 +165,20 @@ const Activity = () => {
             <option value="outbound">Outbound</option>
             <option value="missed">Missed</option>
           </select>
+          <input
+            type="date"
+            value={filters.startDate}
+            onChange={e => handleFilterChange("startDate", e.target.value)}
+            className="filter-select"
+            style={{ minWidth: 120 }}
+          />
+          <input
+            type="date"
+            value={filters.endDate}
+            onChange={e => handleFilterChange("endDate", e.target.value)}
+            className="filter-select"
+            style={{ minWidth: 120 }}
+          />
         </div>
       </div>
 
