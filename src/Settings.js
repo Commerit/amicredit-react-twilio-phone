@@ -32,6 +32,7 @@ export default function Settings() {
     setError("");
     setSuccess("");
     let newAvatarUrl = avatarUrl;
+
     // Upload avatar if changed
     if (avatarFile) {
       const formData = new FormData();
@@ -55,7 +56,8 @@ export default function Settings() {
         return;
       }
     }
-    // Update user profile
+
+    // Update user profile (name and avatar)
     const { error: updateError, data: updatedProfile } = await supabase
       .from('users')
       .update({ full_name: fullName, avatar_url: newAvatarUrl })
@@ -68,7 +70,8 @@ export default function Settings() {
       return;
     }
     setUserProfile(updatedProfile);
-    // Change password if requested
+
+    // Only attempt password change if any password field is filled
     if (currentPassword || newPassword || confirmPassword) {
       if (!currentPassword || !newPassword || !confirmPassword) {
         setError("Please fill in all password fields to change your password.");
@@ -91,13 +94,15 @@ export default function Settings() {
           setLoading(false);
           return;
         }
+        setSuccess("Profile and password updated successfully.");
       } catch (err) {
         setError("Unexpected error updating password: " + (err.message || err));
         setLoading(false);
         return;
       }
+    } else {
+      setSuccess("Profile updated successfully.");
     }
-    setSuccess("Profile updated successfully.");
     setLoading(false);
   };
 
