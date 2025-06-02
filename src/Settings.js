@@ -34,26 +34,21 @@ export default function Settings() {
     let newAvatarUrl = avatarUrl;
     // Upload avatar if changed
     if (avatarFile) {
-      const fileExt = avatarFile.name.split('.').pop();
-      const filePath = `avatars/${user.id}.${fileExt}`;
+      const formData = new FormData();
+      formData.append('avatar', avatarFile);
+      formData.append('userId', user.id);
       try {
-        const { error: uploadError } = await supabase.storage.from('avatars').upload(filePath, avatarFile, { upsert: true });
-        if (uploadError) {
-          if (uploadError.message && uploadError.message.includes('bucket')) {
-            setError("Avatar upload failed: Storage bucket 'avatars' does not exist or is misconfigured. Please create a public 'avatars' bucket in Supabase Storage.");
-          } else {
-            setError("Failed to upload avatar: " + uploadError.message);
-          }
+        const response = await fetch('/api/upload-avatar', {
+          method: 'POST',
+          body: formData,
+        });
+        const result = await response.json();
+        if (!response.ok) {
+          setError("Failed to upload avatar: " + (result.error || 'Unknown error'));
           setLoading(false);
           return;
         }
-        const { data: publicUrlData, error: publicUrlError } = supabase.storage.from('avatars').getPublicUrl(filePath);
-        if (publicUrlError) {
-          setError("Failed to get public URL for avatar: " + publicUrlError.message);
-          setLoading(false);
-          return;
-        }
-        newAvatarUrl = publicUrlData?.publicUrl || newAvatarUrl;
+        newAvatarUrl = result.avatar_url || newAvatarUrl;
       } catch (err) {
         setError("Unexpected error uploading avatar: " + (err.message || err));
         setLoading(false);

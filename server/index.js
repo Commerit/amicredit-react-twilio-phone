@@ -7,6 +7,7 @@ const { VoiceResponse } = require("twilio").twiml;
 const path = require("path");
 const { createClient } = require('@supabase/supabase-js');
 const axios = require('axios');
+const multer = require('multer');
 
 const app = express();
 app.use(bodyParser.urlencoded({ extended: false }));
@@ -383,6 +384,39 @@ app.get("/api/calls/:id", async (req, res) => {
   const { data, error } = await supabase.from('call_logs').select('*').eq('id', id).single();
   if (error) return res.status(404).json({ error: 'Call not found' });
   res.json(data);
+});
+
+// Avatar upload endpoint (server-side, bypasses RLS)
+const upload = multer();
+
+app.post('/api/upload-avatar', upload.single('avatar'), async (req, res) => {
+  try {
+    const userId = req.body.userId;
+    if (!userId) return res.status(400).json({ error: 'Missing userId' });
+    if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+    const file = req.file;
+    const ext = (file.originalname.split('.').pop() || 'png').toLowerCase();
+    const filePath = `avatars/${userId}.${ext}`;
+    // Upload to Supabase Storage
+    const { error: uploadError } = await supabase.storage.from('avatars').upload(filePath, file.buffer, {
+      contentType: file.mimetype,
+      upsert: true,
+    });
+    if (uploadError) {
+      return res.status(500).json({ error: 'Failed to upload avatar', details: uploadError.message });
+    }
+    // Construct public URL
+    const supabaseUrl = config.supabase.url || process.env.SUPABASE_URL;
+    const publicUrl = `${supabaseUrl}/storage/v1/object/public/avatars/${userId}.${ext}`;
+    // Update users table
+    const { error: updateError } = await supabase.from('users').update({ avatar_url: publicUrl }).eq('id', userId);
+    if (updateError) {
+      return res.status(500).json({ error: 'Failed to update user avatar_url', details: updateError.message });
+    }
+    res.json({ avatar_url: publicUrl });
+  } catch (err) {
+    res.status(500).json({ error: 'Unexpected error', details: err.message || err });
+  }
 });
 
 // TEMPORARY: Seed initial agent endpoint (remove after use)
