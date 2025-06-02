@@ -13,16 +13,20 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const session = supabase.auth.session?.() || supabase.auth.getSession?.();
-    if (session && session.user) {
-      setUser(session.user);
-      fetchUserProfile(session.user.id);
-    } else {
-      setUser(null);
-      setUserProfile(null);
-    }
-    setLoading(false);
-    const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
+    // Always check for an existing session on mount
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session && session.user) {
+        setUser(session.user);
+        fetchUserProfile(session.user.id);
+      } else {
+        setUser(null);
+        setUserProfile(null);
+      }
+      setLoading(false);
+    });
+
+    // Listen for auth state changes
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session && session.user) {
         setUser(session.user);
         fetchUserProfile(session.user.id);
@@ -31,8 +35,9 @@ export function AuthProvider({ children }) {
         setUserProfile(null);
       }
     });
+
     return () => {
-      listener?.unsubscribe?.();
+      listener?.subscription?.unsubscribe?.();
     };
     // eslint-disable-next-line
   }, []);
@@ -40,7 +45,7 @@ export function AuthProvider({ children }) {
   async function fetchUserProfile(userId) {
     const { data, error } = await supabase
       .from('users')
-      .select('email, full_name, twilio_phone_number, role')
+      .select('id, email, full_name, twilio_phone_number, role')
       .eq('id', userId)
       .single();
     if (!error) setUserProfile(data);
