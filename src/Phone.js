@@ -7,9 +7,9 @@ import OnCall from "./OnCall";
 import "./Phone.css";
 import states from "./states";
 
-const Phone = ({ token }) => {
+const Phone = ({ token, initialNumber = "", setNumberInUrl }) => {
   const [state, setState] = useState(states.CONNECTING);
-  const [number, setNumber] = useState("");
+  const [number, setNumber] = useState(initialNumber);
   const [conn, setConn] = useState(null);
   const [device, setDevice] = useState(null);
   const [callStart, setCallStart] = useState(null);
@@ -17,6 +17,15 @@ const Phone = ({ token }) => {
   const [timer, setTimer] = useState(0);
   const timerRef = useRef();
   const [isMuted, setIsMuted] = useState(false);
+
+  useEffect(() => {
+    setNumber(initialNumber);
+  }, [initialNumber]);
+
+  useEffect(() => {
+    if (setNumberInUrl) setNumberInUrl(number);
+    // eslint-disable-next-line
+  }, [number]);
 
   useEffect(() => {
     const device = new Device();
@@ -31,7 +40,6 @@ const Phone = ({ token }) => {
       setState(states.ON_CALL);
       setCallStart(Date.now());
       setRingStart(null);
-      // No need to listen for mute/unmute events for button state
     });
     device.on("disconnect", () => {
       setState(states.READY);

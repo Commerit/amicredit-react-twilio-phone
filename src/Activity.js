@@ -1,19 +1,36 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
+import { useSearchParams, useParams, useNavigate } from "react-router-dom";
 import "./Activity.css";
 import CallDetails from "./CallDetails";
 
 const Activity = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { userId } = useParams();
+  const navigate = useNavigate();
+  // Initialize filters from URL
+  const [filters, setFilters] = useState({
+    direction: searchParams.get("direction") || "",
+    search: searchParams.get("search") || "",
+    startDate: searchParams.get("start") || "",
+    endDate: searchParams.get("end") || ""
+  });
   const [calls, setCalls] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [selectedCall, setSelectedCall] = useState(null);
-  const [filters, setFilters] = useState({
-    direction: "", // "", "inbound", "outbound", "missed"
-    search: "",
-    startDate: "",
-    endDate: ""
-  });
+  const [selectedCallId, setSelectedCallId] = useState(searchParams.get("callId") || null);
   const refreshIntervalRef = useRef(null);
 
+  // Keep filters and selectedCallId in sync with URL
+  useEffect(() => {
+    const params = {};
+    if (filters.direction) params.direction = filters.direction;
+    if (filters.search) params.search = filters.search;
+    if (filters.startDate) params.start = filters.startDate;
+    if (filters.endDate) params.end = filters.endDate;
+    if (selectedCallId) params.callId = selectedCallId;
+    setSearchParams(params);
+  }, [filters, selectedCallId, setSearchParams]);
+
+  // Fetch calls when filters change
   const fetchCalls = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     try {
@@ -45,26 +62,19 @@ const Activity = () => {
 
   // Auto-refresh for pending recordings/transcripts
   useEffect(() => {
-    // Clear any existing interval
     if (refreshIntervalRef.current) {
       clearInterval(refreshIntervalRef.current);
     }
-
-    // Check if there are any calls with pending status
     const hasPendingCalls = calls.some(call => 
       call.recording_url === "pending" || 
       call.transcript === "pending" ||
       (!call.recording_url && call.status === "completed" && call.duration_seconds > 0)
     );
-
     if (hasPendingCalls) {
-      // Set up auto-refresh every 5 seconds
       refreshIntervalRef.current = setInterval(() => {
-        fetchCalls(true); // Silent refresh
+        fetchCalls(true);
       }, 5000);
     }
-
-    // Cleanup on unmount or when calls change
     return () => {
       if (refreshIntervalRef.current) {
         clearInterval(refreshIntervalRef.current);
@@ -102,14 +112,25 @@ const Activity = () => {
     setFilters({ ...filters, [key]: value });
   };
 
-  if (selectedCall) {
+  const handleCallClick = (call) => {
+    setSelectedCallId(call.id);
+    // Also update the URL path for deep linking
+    navigate(`/app/${userId}/activity/${call.id}`);
+  };
+
+  // If selectedCallId, show CallDetails
+  if (selectedCallId) {
     return (
       <CallDetails
-        callId={selectedCall.id}
-        onBack={() => setSelectedCall(null)}
+        callId={selectedCallId}
+        onBack={() => {
+          setSelectedCallId(null);
+          navigate(`/app/${userId}/activity?${searchParams.toString()}`);
+        }}
         onViewAllWithNumber={(number) => {
-          setSelectedCall(null);
+          setSelectedCallId(null);
           setFilters({ ...filters, search: number });
+          navigate(`/app/${userId}/activity?search=${encodeURIComponent(number)}`);
         }}
       />
     );
@@ -150,7 +171,7 @@ const Activity = () => {
             <div
               key={call.id}
               className={`call-item ${getCallTypeClass(call)}`}
-              onClick={() => setSelectedCall(call)}
+              onClick={() => handleCallClick(call)}
             >
               <div className="call-icon">{getCallIcon(call)}</div>
               <div className="call-info">
