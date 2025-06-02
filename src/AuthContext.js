@@ -13,15 +13,21 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const session = supabase.auth.session?.() || supabase.auth.getSession?.();
-    if (session && session.user) {
-      setUser(session.user);
-      fetchUserProfile(session.user.id);
-    } else {
-      setUser(null);
-      setUserProfile(null);
+    let mounted = true;
+    async function restoreSession() {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (mounted) {
+        if (session && session.user) {
+          setUser(session.user);
+          fetchUserProfile(session.user.id);
+        } else {
+          setUser(null);
+          setUserProfile(null);
+        }
+        setLoading(false);
+      }
     }
-    setLoading(false);
+    restoreSession();
     const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
       if (session && session.user) {
         setUser(session.user);
@@ -32,6 +38,7 @@ export function AuthProvider({ children }) {
       }
     });
     return () => {
+      mounted = false;
       listener?.unsubscribe?.();
     };
     // eslint-disable-next-line
