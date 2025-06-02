@@ -27,6 +27,35 @@ const Placeholder = ({ label }) => (
 
 const ringtoneUrl = "https://actions.google.com/sounds/v1/alarms/phone_alerts_and_rings.ogg";
 
+const TopRightLogout = () => {
+  const { logout } = useAuth();
+  return (
+    <button
+      onClick={logout}
+      style={{
+        position: 'fixed',
+        top: 24,
+        right: 32,
+        background: '#e65c00',
+        color: '#fff',
+        border: 'none',
+        borderRadius: 6,
+        padding: '10px 22px',
+        fontSize: 16,
+        fontWeight: 600,
+        cursor: 'pointer',
+        zIndex: 2000,
+        boxShadow: '0 2px 8px #0001',
+        transition: 'background 0.2s',
+      }}
+      aria-label="Log out"
+      className="logout-btn"
+    >
+      Log out
+    </button>
+  );
+};
+
 const App = () => {
   const [token, setToken] = useState(null);
   const [clicked, setClicked] = useState(false);
@@ -159,6 +188,7 @@ const App = () => {
           <Route path="/" element={
             <PrivateRoute>
               <div className="app">
+                <TopRightLogout />
                 <main className="main-content">{mainContent}</main>
                 <NavigationBar active={activeSection} onChange={setActiveSection} />
                 {/* Global ringer audio */}

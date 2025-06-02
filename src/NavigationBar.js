@@ -10,7 +10,6 @@ const navItems = [
 ];
 
 const NavigationBar = ({ active, onChange }) => {
-  const { logout } = useAuth();
   const handleNav = (key) => {
     onChange(key);
   };
@@ -29,7 +28,6 @@ const NavigationBar = ({ active, onChange }) => {
           </button>
         ))}
       </div>
-      <button className="logout-btn" onClick={logout} aria-label="Log out">Log out</button>
     </nav>
   );
 }
