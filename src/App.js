@@ -93,13 +93,6 @@ function PrivateRoute({ children }) {
   return user ? children : <Navigate to="/login" replace />;
 }
 
-const Placeholder = ({ label }) => (
-  <div className="placeholder">
-    <h2>{label}</h2>
-    <p>Coming soon...</p>
-  </div>
-);
-
 const ringtoneUrl = "https://actions.google.com/sounds/v1/alarms/phone_alerts_and_rings.ogg";
 
 const TopRightLogout = () => {
