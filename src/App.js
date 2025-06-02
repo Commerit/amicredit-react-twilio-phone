@@ -148,7 +148,6 @@ function AppRoutes() {
 function AppSection() {
   const { userId, section, callId } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { user } = useAuth();
   const [token, setToken] = useState(null);
   const [clicked, setClicked] = useState(false);
   const [device, setDevice] = useState(null);
