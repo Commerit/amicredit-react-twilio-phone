@@ -1,3 +1,4 @@
+require('dotenv').config({ path: '../.env' });
 const config = require("./config");
 const express = require("express");
 const bodyParser = require("body-parser");
@@ -8,7 +9,6 @@ const path = require("path");
 const { createClient } = require('@supabase/supabase-js');
 const axios = require('axios');
 const multer = require('multer');
-const { v4: uuidv4 } = require('uuid');
 
 const app = express();
 app.use(bodyParser.urlencoded({ extended: false }));
@@ -397,20 +397,18 @@ app.post('/api/upload-avatar', upload.single('avatar'), async (req, res) => {
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
     const file = req.file;
     const ext = (file.originalname.split('.').pop() || 'png').toLowerCase();
-    const uuid = uuidv4();
-    const filePath = `avatars/${uuid}.${ext}`;
+    const filePath = `avatars/${userId}.${ext}`;
     // Upload to Supabase Storage
-    const { data, error: uploadError } = await supabase.storage.from('avatars').upload(filePath, file.buffer, {
+    const { error: uploadError } = await supabase.storage.from('avatars').upload(filePath, file.buffer, {
       contentType: file.mimetype,
       upsert: true,
     });
     if (uploadError) {
       return res.status(500).json({ error: 'Failed to upload avatar', details: uploadError.message });
     }
-    // Use the actual path returned by Supabase
+    // Construct public URL
     const supabaseUrl = config.supabase.url || process.env.SUPABASE_URL;
-    const uploadedPath = data?.path || filePath;
-    const publicUrl = `${supabaseUrl}/storage/v1/object/public/${uploadedPath}`;
+    const publicUrl = `${supabaseUrl}/storage/v1/object/public/avatars/${userId}.${ext}`;
     // Update users table
     const { error: updateError } = await supabase.from('users').update({ avatar_url: publicUrl }).eq('id', userId);
     if (updateError) {
