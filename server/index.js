@@ -398,16 +398,17 @@ app.post('/api/upload-avatar', upload.single('avatar'), async (req, res) => {
     const ext = (file.originalname.split('.').pop() || 'png').toLowerCase();
     const filePath = `avatars/${userId}.${ext}`;
     // Upload to Supabase Storage
-    const { error: uploadError } = await supabase.storage.from('avatars').upload(filePath, file.buffer, {
+    const { data, error: uploadError } = await supabase.storage.from('avatars').upload(filePath, file.buffer, {
       contentType: file.mimetype,
       upsert: true,
     });
     if (uploadError) {
       return res.status(500).json({ error: 'Failed to upload avatar', details: uploadError.message });
     }
-    // Construct public URL
+    // Use the actual path returned by Supabase
     const supabaseUrl = config.supabase.url || process.env.SUPABASE_URL;
-    const publicUrl = `${supabaseUrl}/storage/v1/object/public/avatars/${userId}.${ext}`;
+    const uploadedPath = data?.path || filePath; // fallback for older SDKs
+    const publicUrl = `${supabaseUrl}/storage/v1/object/public/${uploadedPath}`;
     // Update users table
     const { error: updateError } = await supabase.from('users').update({ avatar_url: publicUrl }).eq('id', userId);
     if (updateError) {
