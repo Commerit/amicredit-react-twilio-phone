@@ -72,7 +72,7 @@ export default function Settings() {
     setUserProfile(updatedProfile);
 
     // Only attempt password change if any password field is filled
-    if (currentPassword || newPassword || confirmPassword) {
+    if (currentPassword.length > 0 || newPassword.length > 0 || confirmPassword.length > 0) {
       if (!currentPassword || !newPassword || !confirmPassword) {
         setError("Please fill in all password fields to change your password.");
         setLoading(false);
