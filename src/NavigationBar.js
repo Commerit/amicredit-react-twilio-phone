@@ -1,6 +1,6 @@
 import React from "react";
 import "./NavigationBar.css";
-import { useAuth } from './AuthContext';
+// import { useAuth } from './AuthContext';
 
 const navItems = [
   { key: "dialer", label: "Dialer", icon: "\u260E\uFE0F" }, // phone emoji
