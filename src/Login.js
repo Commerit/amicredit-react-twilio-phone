@@ -30,7 +30,7 @@ export default function Login() {
         .eq('id', user.id)
         .single();
       if (!profileError) setUserProfile(profileData);
-      navigate('/');
+      navigate(`/app/${user.id}/dialer`);
     } else {
       setError('Login failed.');
     }

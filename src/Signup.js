@@ -58,7 +58,7 @@ export default function Signup() {
       return;
     }
     setUserProfile(userData);
-    navigate('/');
+    navigate(`/app/${user.id}/dialer`);
     setLoading(false);
   };
 
