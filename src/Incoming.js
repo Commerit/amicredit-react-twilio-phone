@@ -28,6 +28,7 @@ const Incoming = ({ connection, device, caller, onClear, onAcceptUI }) => {
       onAcceptUI();
     }
     connection.accept();
+    if (onClear) onClear();
   };
   const rejectConnection = () => {
     console.log('[Incoming] Rejecting inbound connection', connection);
