@@ -60,6 +60,11 @@ const Phone = ({ token, initialNumber = "", setNumberInUrl }) => {
         setConn(null);
         setRingStart(null);
       });
+      connection.on("accept", () => {
+        setState(states.ON_CALL);
+        setCallStart(Date.now());
+        setRingStart(null);
+      });
     });
     device.on("cancel", () => {
       setState(states.READY);
