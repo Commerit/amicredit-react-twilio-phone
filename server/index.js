@@ -204,7 +204,15 @@ app.post("/twilio/call-status", async (req, res) => {
     if (!user && req.body.answered_by_user_id) {
       user = await findUserByIdOrNumber(req.body.answered_by_user_id);
     }
-    // For missed calls, user is null
+    // Set user_id: always set for outbound and answered inbound, null for missed
+    let upsertUserId = null;
+    if (internalStatus === 'missed') {
+      upsertUserId = null;
+    } else if (user && user.id) {
+      upsertUserId = user.id;
+    } else {
+      upsertUserId = null;
+    }
     const upsertData = {
       id: CallSid,
       parent_call_sid: ParentCallSid || null,
@@ -217,7 +225,7 @@ app.post("/twilio/call-status", async (req, res) => {
       status: internalStatus,
       updated_at: new Date().toISOString(),
       team_id: team ? team.id : null,
-      user_id: (internalStatus === 'missed') ? null : (user ? user.id : null)
+      user_id: upsertUserId
     };
     const result = await supabase.from('call_logs').upsert(upsertData, { onConflict: 'id' });
     if (result.error) {
