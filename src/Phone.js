@@ -56,15 +56,20 @@ const Phone = ({ token, initialNumber = "", setNumberInUrl }) => {
       setRingStart(Date.now());
       setCallStart(null);
       connection.on("reject", () => {
+        console.log("[Twilio] Incoming connection rejected");
         setState(states.READY);
         setConn(null);
         setRingStart(null);
       });
       connection.on("accept", () => {
+        console.log("[Twilio] Inbound call accepted, transitioning to ON_CALL");
         setState(states.ON_CALL);
         setConn(connection);
         setCallStart(Date.now());
         setRingStart(null);
+      });
+      connection.on("disconnect", () => {
+        console.log("[Twilio] Inbound connection disconnected");
       });
     });
     device.on("cancel", () => {
