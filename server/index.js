@@ -278,7 +278,10 @@ app.post("/twilio/call-status", async (req, res) => {
     }
     // Classify direction
     let callDirection = 'unknown';
-    if (teamPhone) {
+    // If From is PSTN and To is client:USER_ID, it's inbound
+    if (From && /^\+\d{8,15}$/.test(From) && typeof To === 'string' && To.startsWith('client:')) {
+      callDirection = 'inbound';
+    } else if (teamPhone) {
       if (From === teamPhone) {
         callDirection = 'outbound';
       } else if (To === teamPhone) {
@@ -350,6 +353,13 @@ app.post("/twilio/call-status", async (req, res) => {
       return res.status(500).json({ error: "Failed to log call" });
     }
     console.log("Call log upserted successfully", upsertData);
+    // Only log child calls with status 'completed' or parent call
+    if (ParentCallSid && CallStatus !== 'completed') {
+      // Only log missed for child if status is missed
+      if (internalStatus !== 'missed') {
+        return res.sendStatus(200);
+      }
+    }
     res.sendStatus(200);
   } catch (error) {
     console.error("Exception in call-status webhook:", error);

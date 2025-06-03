@@ -62,6 +62,7 @@ const Phone = ({ token, initialNumber = "", setNumberInUrl }) => {
       });
       connection.on("accept", () => {
         setState(states.ON_CALL);
+        setConn(connection);
         setCallStart(Date.now());
         setRingStart(null);
       });
