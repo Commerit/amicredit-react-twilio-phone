@@ -147,28 +147,26 @@ const Phone = ({ token, initialNumber = "", setNumberInUrl }) => {
   };
 
   let render;
-  if (conn) {
-    if (state === states.INCOMING) {
-      const caller = (conn.parameters && (conn.parameters.From || conn.parameters.Caller)) || "Unknown";
-      render = (
-        <div className="call-screen">
-          <div className="call-number">{number}</div>
-          <div className="call-status">Ringing... {timer}s</div>
-          <Incoming device={device} connection={conn} caller={caller} onAcceptUI={handleAcceptUI} />
-        </div>
-      );
-    } else if (state === states.ON_CALL) {
-      render = (
-        <div className="call-screen">
-          <div className="call-number">{number}</div>
-          <div className="call-status">On Call {timer}s</div>
-          <OnCall handleHangup={handleHangup} connection={conn} />
-          <button onClick={toggleMute} style={{ margin: '12px', padding: '10px 20px', borderRadius: 6, background: isMuted ? '#e65c00' : '#eee', color: isMuted ? '#fff' : '#222', fontWeight: 600 }}>
-            {isMuted ? 'Unmute' : 'Mute'}
-          </button>
-        </div>
-      );
-    }
+  if (conn && state === states.INCOMING) {
+    const caller = (conn.parameters && (conn.parameters.From || conn.parameters.Caller)) || "Unknown";
+    render = (
+      <div className="call-screen">
+        <div className="call-number">{number}</div>
+        <div className="call-status">Ringing... {timer}s</div>
+        <Incoming device={device} connection={conn} caller={caller} onAcceptUI={handleAcceptUI} />
+      </div>
+    );
+  } else if (conn && state === states.ON_CALL) {
+    render = (
+      <div className="call-screen">
+        <div className="call-number">{number}</div>
+        <div className="call-status">On Call {timer}s</div>
+        <OnCall handleHangup={handleHangup} connection={conn} />
+        <button onClick={toggleMute} style={{ margin: '12px', padding: '10px 20px', borderRadius: 6, background: isMuted ? '#e65c00' : '#eee', color: isMuted ? '#fff' : '#222', fontWeight: 600 }}>
+          {isMuted ? 'Unmute' : 'Mute'}
+        </button>
+      </div>
+    );
   } else {
     render = (
       <>
