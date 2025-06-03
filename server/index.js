@@ -112,9 +112,40 @@ app.post("/voice", async (req, res) => {
   res.send(response.toString());
 });
 
-app.post("/voice/incoming", (req, res) => {
+app.post("/voice/incoming", async (req, res) => {
+  console.log('[INBOUND] Incoming /voice/incoming request:', req.body);
   const baseUrl = getBaseUrl(req);
   const response = new VoiceResponse();
+  // Find the team by the called number (To)
+  let team = null;
+  try {
+    const { data: teamRow, error: teamError } = await supabase
+      .from('teams')
+      .select('id')
+      .eq('phone_number', req.body.To)
+      .single();
+    if (teamError) console.error('[INBOUND] Error looking up team:', teamError);
+    if (teamRow) team = teamRow;
+    console.log('[INBOUND] Team lookup result:', teamRow);
+  } catch (e) {
+    console.error('[INBOUND] Exception looking up team for inbound call:', e);
+  }
+  let users = [];
+  if (team) {
+    try {
+      const { data: userRows, error: usersError } = await supabase
+        .from('users')
+        .select('id')
+        .eq('team_id', team.id);
+      if (usersError) console.error('[INBOUND] Error looking up users:', usersError);
+      if (userRows) users = userRows;
+      console.log('[INBOUND] Users lookup result:', userRows);
+    } catch (e) {
+      console.error('[INBOUND] Exception looking up users for inbound call:', e);
+    }
+  } else {
+    console.warn('[INBOUND] No team found for inbound call to number:', req.body.To);
+  }
   const dial = response.dial({
     callerId: req.body.From,
     answerOnBridge: true,
@@ -123,14 +154,28 @@ app.post("/voice/incoming", (req, res) => {
     recordingStatusCallbackEvent: "completed",
     recordingStatusCallbackMethod: "POST"
   });
-  const client = dial.client({
-    statusCallbackEvent: "initiated ringing answered completed",
-    statusCallback: `${baseUrl}/twilio/call-status`,
-    statusCallbackMethod: "POST"
-  }, "phil");
-  // Pass the real caller's number as a custom parameter
-  client.parameter({ name: "real_from", value: req.body.From });
+  if (users.length > 0) {
+    users.forEach(user => {
+      console.log('[INBOUND] Dialing client identity:', user.id, 'for team:', team.id);
+      const client = dial.client({
+        statusCallbackEvent: "initiated ringing answered completed",
+        statusCallback: `${baseUrl}/twilio/call-status`,
+        statusCallbackMethod: "POST"
+      }, user.id);
+      // Pass the team_id as a custom parameter for logging
+      client.parameter({ name: "team_id", value: team.id });
+    });
+  } else {
+    // fallback: dial a default client (for debugging)
+    console.warn('[INBOUND] No users found for team, dialing fallback client: phil');
+    dial.client({
+      statusCallbackEvent: "initiated ringing answered completed",
+      statusCallback: `${baseUrl}/twilio/call-status`,
+      statusCallbackMethod: "POST"
+    }, "phil");
+  }
   res.set("Content-Type", "text/xml");
+  console.log('[INBOUND] Responding with TwiML:', response.toString());
   res.send(response.toString());
 });
 
@@ -153,16 +198,19 @@ async function findTeamByNumber(phoneNumber) {
 // Webhook endpoints for Twilio events
 app.post("/twilio/call-status", async (req, res) => {
   try {
+    console.log('[CALL-STATUS] Incoming webhook:', req.body);
     // Try to get userId from custom header or parameter (for outbound)
     let userId = req.headers['x-user-id'] || req.body.user_id || null;
     const { CallSid, CallStatus, From, To, Direction, Timestamp, StartTime, EndTime, Duration, CallDuration, RecordingDuration, ParentCallSid } = req.body;
-    console.log('[CALL-STATUS] Incoming webhook:', {
-      CallSid, CallStatus, From, To, Direction, Timestamp, StartTime, EndTime, Duration, CallDuration, RecordingDuration, ParentCallSid, userId_initial: userId
-    });
     // If From is client:USER_ID, extract USER_ID
     if (!userId && typeof From === 'string' && From.startsWith('client:')) {
       userId = From.replace('client:', '');
       console.log('[CALL-STATUS] Extracted userId from From:', userId);
+    }
+    // For inbound calls, if the event is 'answered' or 'in-progress' and From is not client:..., but To is client:USER_ID, extract userId from To
+    if (!userId && typeof To === 'string' && To.startsWith('client:') && (CallStatus === 'answered' || CallStatus === 'in-progress')) {
+      userId = To.replace('client:', '');
+      console.log('[CALL-STATUS] Extracted userId from To (inbound answered):', userId);
     }
     // If still no userId, try to find from pending_calls
     if (!userId && To) {
@@ -184,36 +232,48 @@ app.post("/twilio/call-status", async (req, res) => {
         console.error('Error looking up pending_calls:', pendingError);
       }
     }
+    // If custom parameter team_id is present, use it
+    let teamIdParam = req.body.team_id || null;
     // Find user and team
     let user = null, team = null, teamPhone = null;
     if (userId) {
-      user = await findUserByIdOrNumber(userId);
-      console.log('[CALL-STATUS] Found user:', user);
-      if (user && user.team_id) {
-        team = { id: user.team_id };
-        // Fetch team phone number
-        const { data: teamRow } = await supabase.from('teams').select('phone_number').eq('id', user.team_id).single();
-        if (teamRow) teamPhone = teamRow.phone_number;
-        console.log('[CALL-STATUS] Found team and phone:', team, teamPhone);
+      try {
+        user = await findUserByIdOrNumber(userId);
+        console.log('[CALL-STATUS] Found user:', user);
+        if (user && user.team_id) {
+          team = { id: user.team_id };
+          // Fetch team phone number
+          const { data: teamRow } = await supabase.from('teams').select('phone_number').eq('id', user.team_id).single();
+          if (teamRow) teamPhone = teamRow.phone_number;
+          console.log('[CALL-STATUS] Found team and phone:', team, teamPhone);
+        }
+      } catch (e) {
+        console.error('[CALL-STATUS] Exception looking up user/team:', e);
       }
     }
     // If no team yet, try to find by To or From number
     if (!teamPhone) {
-      // Try to match To number
-      const { data: teamByTo } = await supabase.from('teams').select('id, phone_number').eq('phone_number', To).single();
-      if (teamByTo) {
-        team = { id: teamByTo.id };
-        teamPhone = teamByTo.phone_number;
-        console.log('[CALL-STATUS] Matched team by To:', team, teamPhone);
+      try {
+        const { data: teamByTo } = await supabase.from('teams').select('id, phone_number').eq('phone_number', To).single();
+        if (teamByTo) {
+          team = { id: teamByTo.id };
+          teamPhone = teamByTo.phone_number;
+          console.log('[CALL-STATUS] Matched team by To:', team, teamPhone);
+        }
+      } catch (e) {
+        console.error('[CALL-STATUS] Exception matching team by To:', e);
       }
     }
     if (!teamPhone) {
-      // Try to match From number
-      const { data: teamByFrom } = await supabase.from('teams').select('id, phone_number').eq('phone_number', From).single();
-      if (teamByFrom) {
-        team = { id: teamByFrom.id };
-        teamPhone = teamByFrom.phone_number;
-        console.log('[CALL-STATUS] Matched team by From:', team, teamPhone);
+      try {
+        const { data: teamByFrom } = await supabase.from('teams').select('id, phone_number').eq('phone_number', From).single();
+        if (teamByFrom) {
+          team = { id: teamByFrom.id };
+          teamPhone = teamByFrom.phone_number;
+          console.log('[CALL-STATUS] Matched team by From:', team, teamPhone);
+        }
+      } catch (e) {
+        console.error('[CALL-STATUS] Exception matching team by From:', e);
       }
     }
     // Classify direction
@@ -245,8 +305,12 @@ app.post("/twilio/call-status", async (req, res) => {
     else if (StartTime && EndTime) durationSeconds = Math.floor((new Date(EndTime) - new Date(StartTime)) / 1000);
     // For answered inbound, try to get user who answered (if available)
     if (!user && req.body.answered_by_user_id) {
-      user = await findUserByIdOrNumber(req.body.answered_by_user_id);
-      console.log('[CALL-STATUS] Found user by answered_by_user_id:', user);
+      try {
+        user = await findUserByIdOrNumber(req.body.answered_by_user_id);
+        console.log('[CALL-STATUS] Found user by answered_by_user_id:', user);
+      } catch (e) {
+        console.error('[CALL-STATUS] Exception looking up answered_by_user_id:', e);
+      }
     }
     // Fetch existing call log if it exists
     let existingCallLog = null;
@@ -258,9 +322,8 @@ app.post("/twilio/call-status", async (req, res) => {
         .single();
       if (existing) existingCallLog = existing;
     } catch (e) {
-      // ignore
+      console.error('[CALL-STATUS] Exception fetching existing call log:', e);
     }
-
     const upsertData = {
       id: CallSid,
       parent_call_sid: ParentCallSid || null,
@@ -272,7 +335,7 @@ app.post("/twilio/call-status", async (req, res) => {
       duration_seconds: durationSeconds,
       status: internalStatus,
       updated_at: new Date().toISOString(),
-      team_id: team ? team.id : (existingCallLog ? existingCallLog.team_id : null),
+      team_id: teamIdParam || (team ? team.id : (existingCallLog ? existingCallLog.team_id : null)),
       user_id:
         (internalStatus === 'missed')
           ? (existingCallLog ? existingCallLog.user_id : null)
