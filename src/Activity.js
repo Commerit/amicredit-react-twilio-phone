@@ -34,6 +34,7 @@ const Activity = () => {
 
   // Fetch calls for this user and their team (missed)
   const fetchCalls = useCallback(async (silent = false) => {
+    console.log('[Activity] fetchCalls called. userProfile:', userProfile, 'filters:', filters);
     if (!userProfile) return;
     if (!silent) setLoading(true);
     try {
@@ -54,6 +55,7 @@ const Activity = () => {
       if (filters.endDate) query = query.lte("started_at", filters.endDate);
       query = query.order('started_at', { ascending: false }).limit(50);
       const { data, error } = await query;
+      console.log('[Activity] fetchCalls result:', { data, error });
       setCalls(error ? [] : data || []);
     } catch (error) {
       console.error("Error fetching calls:", error);

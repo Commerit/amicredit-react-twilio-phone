@@ -7,6 +7,7 @@ const Incoming = ({ connection, device, caller, onClear }) => {
   const audioRef = useRef();
 
   useEffect(() => {
+    console.log('[Incoming] Incoming modal mounted', connection);
     const audio = audioRef.current;
     if (audio) {
       audio.play();
@@ -16,14 +17,16 @@ const Incoming = ({ connection, device, caller, onClear }) => {
         audio.pause();
         audio.currentTime = 0;
       }
+      console.log('[Incoming] Incoming modal unmounted', connection);
     };
   }, []);
 
   const acceptConnection = () => {
+    console.log('[Incoming] Accepting inbound connection', connection);
     connection.accept();
-    if (onClear) onClear();
   };
   const rejectConnection = () => {
+    console.log('[Incoming] Rejecting inbound connection', connection);
     connection.reject();
     if (onClear) onClear();
   };
