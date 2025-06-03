@@ -86,8 +86,8 @@ app.post("/voice", (req, res) => {
   const To = req.body.To;
   const baseUrl = getBaseUrl(req);
   const response = new VoiceResponse();
+  // For client-originated calls, do NOT set callerId so Twilio uses the client identity (client:USER_ID)
   const dial = response.dial({
-    callerId: config.twilio.callerId,
     record: "record-from-answer-dual",
     recordingStatusCallback: `${baseUrl}/twilio/recording`,
     recordingStatusCallbackEvent: "completed",
