@@ -3,7 +3,7 @@ import "./Incoming.css";
 
 const ringtoneUrl = "https://actions.google.com/sounds/v1/alarms/phone_alerts_and_rings.ogg";
 
-const Incoming = ({ connection, device, caller, onClear }) => {
+const Incoming = ({ connection, device, caller, onClear, onAcceptUI }) => {
   const audioRef = useRef();
 
   useEffect(() => {
@@ -19,10 +19,14 @@ const Incoming = ({ connection, device, caller, onClear }) => {
       }
       console.log('[Incoming] Incoming modal unmounted', connection);
     };
-  }, []);
+  }, [connection]);
 
   const acceptConnection = () => {
     console.log('[Incoming] Accepting inbound connection', connection);
+    if (typeof onAcceptUI === 'function') {
+      console.log('[Incoming] Calling onAcceptUI to trigger instant ON_CALL UI');
+      onAcceptUI();
+    }
     connection.accept();
   };
   const rejectConnection = () => {

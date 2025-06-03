@@ -136,6 +136,16 @@ const Phone = ({ token, initialNumber = "", setNumberInUrl }) => {
     }
   };
 
+  // Handler for instant UI transition on Accept
+  const handleAcceptUI = () => {
+    if (conn) {
+      console.log('[Phone] handleAcceptUI: User accepted call, transitioning to ON_CALL immediately');
+      setState(states.ON_CALL);
+      setCallStart(Date.now());
+      setRingStart(null);
+    }
+  };
+
   let render;
   if (conn) {
     if (state === states.INCOMING) {
@@ -144,7 +154,7 @@ const Phone = ({ token, initialNumber = "", setNumberInUrl }) => {
         <div className="call-screen">
           <div className="call-number">{number}</div>
           <div className="call-status">Ringing... {timer}s</div>
-          <Incoming device={device} connection={conn} caller={caller} />
+          <Incoming device={device} connection={conn} caller={caller} onAcceptUI={handleAcceptUI} />
         </div>
       );
     } else if (state === states.ON_CALL) {
