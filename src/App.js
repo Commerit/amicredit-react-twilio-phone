@@ -203,6 +203,7 @@ function AppSection() {
   const [incomingRinging, setIncomingRinging] = useState(false);
   const tokenRef = useRef(token);
   const ringerRef = useRef();
+  const { user } = useAuth();
 
   useEffect(() => { tokenRef.current = token; }, [token]);
 
@@ -278,7 +279,8 @@ function AppSection() {
 
   const handleClick = () => {
     setClicked(true);
-    fetch(`/voice/token?identity=${encodeURIComponent(userId)}`)
+    const identity = user ? user.id : userId;
+    fetch(`/voice/token?identity=${encodeURIComponent(identity)}`)
       .then(response => response.json())
       .then(({ token }) => setToken(token));
   };
