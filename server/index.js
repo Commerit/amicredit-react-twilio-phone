@@ -248,7 +248,19 @@ app.post("/twilio/call-status", async (req, res) => {
       user = await findUserByIdOrNumber(req.body.answered_by_user_id);
       console.log('[CALL-STATUS] Found user by answered_by_user_id:', user);
     }
-    // For missed calls, user is null
+    // Fetch existing call log if it exists
+    let existingCallLog = null;
+    try {
+      const { data: existing, error: fetchError } = await supabase
+        .from('call_logs')
+        .select('user_id, team_id')
+        .eq('id', CallSid)
+        .single();
+      if (existing) existingCallLog = existing;
+    } catch (e) {
+      // ignore
+    }
+
     const upsertData = {
       id: CallSid,
       parent_call_sid: ParentCallSid || null,
@@ -260,8 +272,13 @@ app.post("/twilio/call-status", async (req, res) => {
       duration_seconds: durationSeconds,
       status: internalStatus,
       updated_at: new Date().toISOString(),
-      team_id: team ? team.id : null,
-      user_id: (internalStatus === 'missed') ? null : (user ? user.id : null)
+      team_id: team ? team.id : (existingCallLog ? existingCallLog.team_id : null),
+      user_id:
+        (internalStatus === 'missed')
+          ? (existingCallLog ? existingCallLog.user_id : null)
+          : (user
+              ? user.id
+              : (existingCallLog ? existingCallLog.user_id : null))
     };
     console.log('[CALL-STATUS] Upserting call log:', upsertData);
     const result = await supabase.from('call_logs').upsert(upsertData, { onConflict: 'id' });
