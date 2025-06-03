@@ -82,12 +82,22 @@ app.post("/voice/token", (req, res) => {
   sendTokenResponse(token, res);
 });
 
-app.post("/voice", (req, res) => {
+app.post("/voice", async (req, res) => {
   const To = req.body.To;
+  const userId = req.body.user_id;
   const baseUrl = getBaseUrl(req);
+  // Insert pending call record
+  if (userId && To) {
+    try {
+      await supabase.from('pending_calls').insert({ user_id: userId, to_number: To });
+    } catch (err) {
+      console.error('Error inserting pending call:', err);
+    }
+  }
   const response = new VoiceResponse();
-  // For client-originated calls, do NOT set callerId so Twilio uses the client identity (client:USER_ID)
+  // Always set callerId to the team's number for outbound PSTN calls
   const dial = response.dial({
+    callerId: config.twilio.callerId,
     record: "record-from-answer-dual",
     recordingStatusCallback: `${baseUrl}/twilio/recording`,
     recordingStatusCallbackEvent: "completed",
@@ -153,6 +163,26 @@ app.post("/twilio/call-status", async (req, res) => {
     if (!userId && typeof From === 'string' && From.startsWith('client:')) {
       userId = From.replace('client:', '');
       console.log('[CALL-STATUS] Extracted userId from From:', userId);
+    }
+    // If still no userId, try to find from pending_calls
+    if (!userId && To) {
+      // Find the most recent pending call for this To number within the last 5 minutes
+      const { data: pending, error: pendingError } = await supabase
+        .from('pending_calls')
+        .select('*')
+        .eq('to_number', To)
+        .gte('created_at', new Date(Date.now() - 5 * 60 * 1000).toISOString())
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+      if (pending && pending.user_id) {
+        userId = pending.user_id;
+        console.log('[CALL-STATUS] Matched userId from pending_calls:', userId);
+        // Delete the pending call row
+        await supabase.from('pending_calls').delete().eq('id', pending.id);
+      } else if (pendingError) {
+        console.error('Error looking up pending_calls:', pendingError);
+      }
     }
     // Find user and team
     let user = null, team = null, teamPhone = null;

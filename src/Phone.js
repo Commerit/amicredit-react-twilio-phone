@@ -97,8 +97,14 @@ const Phone = ({ token, initialNumber = "", setNumberInUrl }) => {
     }
   }, [state, callStart, ringStart]);
 
-  const handleCall = () => {
+  const handleCall = async () => {
     if (device && number && /^\+\d{8,15}$/.test(number) && user) {
+      // POST to /voice to log the pending call
+      await fetch('/voice', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ To: number, user_id: user.id })
+      });
       device.connect({ To: number, user_id: user.id });
     }
   };
