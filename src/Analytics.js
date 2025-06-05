@@ -46,8 +46,9 @@ export default function Analytics() {
       setLoading(false);
       return;
     }
-    start = start.toISOString();
-    end = end.toISOString();
+    // Ensure end is always the end of the day (23:59:59.999)
+    start = dayjs(start).startOf('day').toISOString();
+    end = dayjs(end).endOf('day').toISOString();
     // Fetch all calls for this agent in range
     let query = supabase.from('call_logs').select('*').eq('user_id', userProfile.id).gte('started_at', start).lte('started_at', end);
     const { data: calls, error } = await query;

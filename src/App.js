@@ -196,7 +196,6 @@ function AppSection() {
   const { userId, section, callId } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
   const [token, setToken] = useState(null);
-  const [clicked, setClicked] = useState(false);
   const [device, setDevice] = useState(null);
   const [incomingConn, setIncomingConn] = useState(null);
   const [incomingCaller, setIncomingCaller] = useState("");
@@ -204,6 +203,7 @@ function AppSection() {
   const tokenRef = useRef(token);
   const ringerRef = useRef();
   const { user } = useAuth();
+  const [phoneReady, setPhoneReady] = useState(false);
 
   useEffect(() => { tokenRef.current = token; }, [token]);
 
@@ -214,7 +214,7 @@ function AppSection() {
     device.setup(token, { debug: true });
     setDevice(device);
 
-    device.on("ready", () => {});
+    device.on("ready", () => { setPhoneReady(true); });
     device.on("incoming", connection => {
       setIncomingConn(connection);
       const params = connection.parameters || {};
@@ -245,6 +245,7 @@ function AppSection() {
     return () => {
       device.destroy();
       setDevice(null);
+      setPhoneReady(false);
     };
   }, [token]);
 
@@ -277,26 +278,29 @@ function AppSection() {
     }
   }, [incomingConn, incomingRinging, incomingCaller]);
 
-  const handleClick = () => {
-    setClicked(true);
-    const identity = user ? user.id : userId;
-    fetch(`/voice/token?identity=${encodeURIComponent(identity)}`)
-      .then(response => response.json())
-      .then(({ token }) => setToken(token));
-  };
+  // Automatically fetch token for dialer
+  useEffect(() => {
+    if (section === "dialer" && user && !token) {
+      fetch(`/voice/token?identity=${encodeURIComponent(user.id)}`)
+        .then(response => response.json())
+        .then(({ token }) => setToken(token));
+    }
+  }, [section, user, token]);
 
   // Section rendering based on URL
   let mainContent;
   if (section === "dialer") {
-    // Get dialed number from query param
-    const number = searchParams.get("number") || "";
-    mainContent = !clicked ? (
-      <button className="connect-btn" onClick={handleClick}>Connect to Phone</button>
-    ) : token && device ? (
-      <Phone token={token} device={device} initialNumber={number} setNumberInUrl={num => setSearchParams({ number: num })} />
-    ) : (
-      <p>Loading...</p>
-    );
+    // No pre-populated number
+    if (!token || !device || !phoneReady) {
+      mainContent = (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+          <div className="spinner" style={{ width: 48, height: 48, border: '4px solid #eee', borderTop: '4px solid #e65c00', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+          <div style={{ marginTop: 16, color: '#888', fontSize: 16 }}>Connecting phone...</div>
+        </div>
+      );
+    } else {
+      mainContent = <Phone token={token} device={device} initialNumber="" setNumberInUrl={() => {}} />;
+    }
   } else if (section === "activity") {
     if (callId) {
       mainContent = <Activity callId={callId} />;
