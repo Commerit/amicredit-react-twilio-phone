@@ -9,7 +9,6 @@ import "./App.css";
 import Phone from "./Phone";
 import NavigationBar from "./NavigationBar";
 import { Device } from "twilio-client";
-import Incoming from "./Incoming";
 import Settings from "./Settings";
 
 // --- Contacts Page ---
@@ -283,18 +282,6 @@ function AppSection() {
     fetch(`/voice/token?identity=${encodeURIComponent(identity)}`)
       .then(response => response.json())
       .then(({ token }) => setToken(token));
-  };
-
-  const clearIncoming = () => {
-    setIncomingConn(null);
-    setIncomingRinging(false);
-  };
-
-  // Handler for Accept in global Incoming modal
-  const handleAcceptIncoming = () => {
-    setIncomingRinging(false);
-    // Optionally, you could trigger other UI state changes here if needed
-    // e.g., show the in-call UI, etc.
   };
 
   // Section rendering based on URL
