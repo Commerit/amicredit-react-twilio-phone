@@ -15,12 +15,16 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     let mounted = true;
     async function restoreSession() {
+      console.log('[AuthContext] Running restoreSession...');
       const { data: { session } } = await supabase.auth.getSession();
+      console.log('[AuthContext] restoreSession result:', session);
       if (mounted) {
         if (session && session.user) {
+          console.log('[AuthContext] Session found, setting user:', session.user);
           setUser(session.user);
           fetchUserProfile(session.user.id);
         } else {
+          console.log('[AuthContext] No session found, clearing user and userProfile');
           setUser(null);
           setUserProfile(null);
         }
@@ -29,10 +33,13 @@ export function AuthProvider({ children }) {
     }
     restoreSession();
     const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('[AuthContext] onAuthStateChange event:', event, 'session:', session);
       if (session && session.user) {
+        console.log('[AuthContext] Auth state change: user logged in:', session.user);
         setUser(session.user);
         fetchUserProfile(session.user.id);
       } else {
+        console.log('[AuthContext] Auth state change: user logged out or no session');
         setUser(null);
         setUserProfile(null);
       }
@@ -45,19 +52,27 @@ export function AuthProvider({ children }) {
   }, []);
 
   async function fetchUserProfile(userId) {
+    console.log('[AuthContext] fetchUserProfile called with userId:', userId);
     const { data, error } = await supabase
       .from('users')
       .select('email, full_name, twilio_phone_number, role')
       .eq('id', userId)
       .single();
-    console.log('fetchUserProfile', { userId, data, error });
-    if (!error) setUserProfile(data);
+    console.log('[AuthContext] fetchUserProfile result:', { userId, data, error });
+    if (!error) {
+      console.log('[AuthContext] Setting userProfile:', data);
+      setUserProfile(data);
+    } else {
+      console.error('[AuthContext] Error fetching user profile:', error);
+    }
   }
 
   async function logout() {
+    console.log('[AuthContext] logout called');
     await supabase.auth.signOut();
     setUser(null);
     setUserProfile(null);
+    console.log('[AuthContext] User and userProfile cleared after logout');
   }
 
   const value = {
