@@ -10,6 +10,7 @@ import Phone from "./Phone";
 import NavigationBar from "./NavigationBar";
 import { Device } from "twilio-client";
 import Settings from "./Settings";
+import Analytics from "./Analytics";
 
 // --- Contacts Page ---
 function Contacts() {
@@ -64,74 +65,74 @@ function Contacts() {
 }
 
 // --- Analytics Page ---
-function Analytics() {
-  const [searchParams, setSearchParams] = useSearchParams();
-  const [filters, setFilters] = useState({
-    start: searchParams.get("start") || "",
-    end: searchParams.get("end") || "",
-    type: searchParams.get("type") || "",
-  });
-  const { userProfile, supabase } = useAuth();
-  const [stats, setStats] = useState({ inbound: 0, outbound: 0, missed: 0 });
-  const [loading, setLoading] = useState(true);
-  useEffect(() => {
-    const params = {};
-    if (filters.start) params.start = filters.start;
-    if (filters.end) params.end = filters.end;
-    if (filters.type) params.type = filters.type;
-    setSearchParams(params);
-  }, [filters, setSearchParams]);
-  useEffect(() => {
-    async function fetchStats() {
-      if (!userProfile) return;
-      setLoading(true);
-      let query = supabase.from('call_logs').select('*');
-      query = query.or(`user_id.eq.${userProfile.id},and(user_id.is.null,team_id.eq.${userProfile.team_id},status.eq.missed)`);
-      if (filters.start) query = query.gte('started_at', filters.start);
-      if (filters.end) query = query.lte('started_at', filters.end);
-      const { data, error } = await query;
-      if (error || !data) {
-        setStats({ inbound: 0, outbound: 0, missed: 0 });
-        setLoading(false);
-        return;
-      }
-      const inbound = data.filter(c => c.direction === 'inbound' && c.status !== 'missed').length;
-      const outbound = data.filter(c => c.direction === 'outbound' && c.status !== 'missed').length;
-      const missed = data.filter(c => c.status === 'missed').length;
-      setStats({ inbound, outbound, missed });
-      setLoading(false);
-    }
-    fetchStats();
-  }, [filters, userProfile, supabase]);
-  return (
-    <div style={{ maxWidth: 800, margin: '0 auto', padding: 24 }}>
-      <h2>Analytics</h2>
-      <div style={{ display: 'flex', gap: 16, marginBottom: 24 }}>
-        <input
-          type="date"
-          value={filters.start}
-          onChange={e => setFilters(f => ({ ...f, start: e.target.value }))}
-          style={{ padding: 8, borderRadius: 6, border: '1.5px solid #eee', fontSize: 16 }}
-        />
-        <input
-          type="date"
-          value={filters.end}
-          onChange={e => setFilters(f => ({ ...f, end: e.target.value }))}
-          style={{ padding: 8, borderRadius: 6, border: '1.5px solid #eee', fontSize: 16 }}
-        />
-      </div>
-      {loading ? (
-        <div style={{ color: '#888', fontSize: 15 }}>Loading analytics...</div>
-      ) : (
-        <div style={{ color: '#222', fontSize: 18, display: 'flex', gap: 32 }}>
-          <div><strong>Inbound:</strong> {stats.inbound}</div>
-          <div><strong>Outbound:</strong> {stats.outbound}</div>
-          <div><strong>Missed:</strong> {stats.missed}</div>
-        </div>
-      )}
-    </div>
-  );
-}
+// function Analytics() {
+//   const [searchParams, setSearchParams] = useSearchParams();
+//   const [filters, setFilters] = useState({
+//     start: searchParams.get("start") || "",
+//     end: searchParams.get("end") || "",
+//     type: searchParams.get("type") || "",
+//   });
+//   const { userProfile, supabase } = useAuth();
+//   const [stats, setStats] = useState({ inbound: 0, outbound: 0, missed: 0 });
+//   const [loading, setLoading] = useState(true);
+//   useEffect(() => {
+//     const params = {};
+//     if (filters.start) params.start = filters.start;
+//     if (filters.end) params.end = filters.end;
+//     if (filters.type) params.type = filters.type;
+//     setSearchParams(params);
+//   }, [filters, setSearchParams]);
+//   useEffect(() => {
+//     async function fetchStats() {
+//       if (!userProfile) return;
+//       setLoading(true);
+//       let query = supabase.from('call_logs').select('*');
+//       query = query.or(`user_id.eq.${userProfile.id},and(user_id.is.null,team_id.eq.${userProfile.team_id},status.eq.missed)`);
+//       if (filters.start) query = query.gte('started_at', filters.start);
+//       if (filters.end) query = query.lte('started_at', filters.end);
+//       const { data, error } = await query;
+//       if (error || !data) {
+//         setStats({ inbound: 0, outbound: 0, missed: 0 });
+//         setLoading(false);
+//         return;
+//       }
+//       const inbound = data.filter(c => c.direction === 'inbound' && c.status !== 'missed').length;
+//       const outbound = data.filter(c => c.direction === 'outbound' && c.status !== 'missed').length;
+//       const missed = data.filter(c => c.status === 'missed').length;
+//       setStats({ inbound, outbound, missed });
+//       setLoading(false);
+//     }
+//     fetchStats();
+//   }, [filters, userProfile, supabase]);
+//   return (
+//     <div style={{ maxWidth: 800, margin: '0 auto', padding: 24 }}>
+//       <h2>Analytics</h2>
+//       <div style={{ display: 'flex', gap: 16, marginBottom: 24 }}>
+//         <input
+//           type="date"
+//           value={filters.start}
+//           onChange={e => setFilters(f => ({ ...f, start: e.target.value }))}
+//           style={{ padding: 8, borderRadius: 6, border: '1.5px solid #eee', fontSize: 16 }}
+//         />
+//         <input
+//           type="date"
+//           value={filters.end}
+//           onChange={e => setFilters(f => ({ ...f, end: e.target.value }))}
+//           style={{ padding: 8, borderRadius: 6, border: '1.5px solid #eee', fontSize: 16 }}
+//         />
+//       </div>
+//       {loading ? (
+//         <div style={{ color: '#888', fontSize: 15 }}>Loading analytics...</div>
+//       ) : (
+//         <div style={{ color: '#222', fontSize: 18, display: 'flex', gap: 32 }}>
+//           <div><strong>Inbound:</strong> {stats.inbound}</div>
+//           <div><strong>Outbound:</strong> {stats.outbound}</div>
+//           <div><strong>Missed:</strong> {stats.missed}</div>
+//         </div>
+//       )}
+//     </div>
+//   );
+// }
 
 function PrivateRoute({ children }) {
   const { user, loading } = useAuth();
