@@ -30,20 +30,24 @@ const Phone = ({ token, initialNumber = "", setNumberInUrl }) => {
   }, [number]);
 
   useEffect(() => {
+    console.log('[Phone] Initializing Twilio Device with token:', token);
     const device = new Device();
     device.setup(token, { debug: true });
 
     device.on("ready", () => {
+      console.log('[Phone] Device ready');
       setDevice(device);
       setState(states.READY);
     });
     device.on("connect", connection => {
+      console.log('[Phone] Device connect event', connection);
       setConn(connection);
       setState(states.ON_CALL);
       setCallStart(Date.now());
       setRingStart(null);
     });
     device.on("disconnect", () => {
+      console.log('[Phone] Device disconnect event');
       setState(states.READY);
       setConn(null);
       setCallStart(null);
@@ -51,6 +55,7 @@ const Phone = ({ token, initialNumber = "", setNumberInUrl }) => {
       setIsMuted(false);
     });
     device.on("incoming", connection => {
+      console.log('[Phone] Device incoming event', connection);
       setState(states.INCOMING);
       setConn(connection);
       setRingStart(Date.now());
@@ -73,17 +78,20 @@ const Phone = ({ token, initialNumber = "", setNumberInUrl }) => {
       });
     });
     device.on("cancel", () => {
+      console.log('[Phone] Device cancel event');
       setState(states.READY);
       setConn(null);
       setRingStart(null);
     });
     device.on("reject", () => {
+      console.log('[Phone] Device reject event');
       setState(states.READY);
       setConn(null);
       setRingStart(null);
     });
 
     return () => {
+      console.log('[Phone] Destroying Twilio Device');
       device.destroy();
       setDevice(null);
       setState(states.OFFLINE);
@@ -92,6 +100,7 @@ const Phone = ({ token, initialNumber = "", setNumberInUrl }) => {
 
   // Timer logic
   useEffect(() => {
+    console.log('[Phone] Timer effect: state =', state, 'callStart =', callStart, 'ringStart =', ringStart);
     if (state === states.ON_CALL && callStart) {
       timerRef.current = setInterval(() => {
         setTimer(Math.floor((Date.now() - callStart) / 1000));
@@ -109,6 +118,7 @@ const Phone = ({ token, initialNumber = "", setNumberInUrl }) => {
   }, [state, callStart, ringStart]);
 
   const handleCall = async () => {
+    console.log('[Phone] handleCall called', { device, number, user });
     if (device && number && /^\+\d{8,15}$/.test(number) && user) {
       // POST to /voice to log the pending call
       await fetch('/voice', {
@@ -121,10 +131,12 @@ const Phone = ({ token, initialNumber = "", setNumberInUrl }) => {
   };
 
   const handleHangup = () => {
+    console.log('[Phone] handleHangup called');
     device.disconnectAll();
   };
 
   const toggleMute = () => {
+    console.log('[Phone] toggleMute called', { isMuted, conn });
     if (conn) {
       if (isMuted) {
         conn.mute(false); // Unmute
@@ -138,17 +150,24 @@ const Phone = ({ token, initialNumber = "", setNumberInUrl }) => {
 
   // Handler for instant UI transition on Accept
   const handleAcceptUI = () => {
+    console.log('[Phone] handleAcceptUI called', { conn, state });
     if (conn) {
       console.log('[Phone] handleAcceptUI: User accepted call, transitioning to ON_CALL immediately');
       setState(states.ON_CALL);
       setCallStart(Date.now());
       setRingStart(null);
+    } else {
+      console.warn('[Phone] handleAcceptUI: conn is null');
     }
   };
+
+  // Log what is being rendered
+  console.log('[Phone] Render: state =', state, 'conn =', conn, 'number =', number);
 
   let render;
   if (conn && state === states.INCOMING) {
     const caller = (conn.parameters && (conn.parameters.From || conn.parameters.Caller)) || "Unknown";
+    console.log('[Phone] Rendering Incoming UI', { caller, timer });
     render = (
       <div className="call-screen">
         <div className="call-number">{number}</div>
@@ -157,6 +176,7 @@ const Phone = ({ token, initialNumber = "", setNumberInUrl }) => {
       </div>
     );
   } else if (conn && state === states.ON_CALL) {
+    console.log('[Phone] Rendering OnCall UI', { timer, number });
     render = (
       <div className="call-screen">
         <div className="call-number">{number}</div>
@@ -168,6 +188,7 @@ const Phone = ({ token, initialNumber = "", setNumberInUrl }) => {
       </div>
     );
   } else {
+    console.log('[Phone] Rendering Dialler UI', { number });
     render = (
       <>
         <Dialler number={number} setNumber={setNumber} />

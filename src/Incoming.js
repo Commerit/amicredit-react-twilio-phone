@@ -7,7 +7,7 @@ const Incoming = ({ connection, device, caller, onClear, onAcceptUI }) => {
   const audioRef = useRef();
 
   useEffect(() => {
-    console.log('[Incoming] Incoming modal mounted', connection);
+    console.log('[Incoming] Incoming modal mounted', { connection, device, caller });
     const audio = audioRef.current;
     if (audio) {
       audio.play();
@@ -17,22 +17,28 @@ const Incoming = ({ connection, device, caller, onClear, onAcceptUI }) => {
         audio.pause();
         audio.currentTime = 0;
       }
-      console.log('[Incoming] Incoming modal unmounted', connection);
+      console.log('[Incoming] Incoming modal unmounted', { connection, device, caller });
     };
-  }, [connection]);
+  }, [connection, device, caller]);
 
   const acceptConnection = () => {
-    console.log('[Incoming] Accepting inbound connection', connection);
+    console.log('[Incoming] Accept button clicked', { connection, device, caller });
     if (typeof onAcceptUI === 'function') {
       console.log('[Incoming] Calling onAcceptUI to trigger instant ON_CALL UI');
       onAcceptUI();
+    } else {
+      console.warn('[Incoming] onAcceptUI is not a function');
     }
+    console.log('[Incoming] Calling connection.accept()');
     connection.accept();
   };
   const rejectConnection = () => {
-    console.log('[Incoming] Rejecting inbound connection', connection);
+    console.log('[Incoming] Decline button clicked', { connection, device, caller });
     connection.reject();
-    if (onClear) onClear();
+    if (onClear) {
+      console.log('[Incoming] Calling onClear after reject');
+      onClear();
+    }
   };
   return (
     <div className="incoming-overlay">

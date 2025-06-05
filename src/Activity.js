@@ -58,8 +58,24 @@ const Activity = () => {
       if (filters.search) {
         query = query.or(`from_number.ilike.%${filters.search}%,to_number.ilike.%${filters.search}%`);
       }
-      if (filters.startDate) query = query.gte("started_at", filters.startDate);
-      if (filters.endDate) query = query.lte("started_at", filters.endDate);
+      // --- Date range fix ---
+      let startDate = filters.startDate;
+      let endDate = filters.endDate;
+      if (endDate) {
+        // Convert to end of day
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        endDate = end.toISOString();
+      }
+      if (startDate) {
+        // Convert to start of day
+        const start = new Date(startDate);
+        start.setHours(0, 0, 0, 0);
+        startDate = start.toISOString();
+      }
+      if (startDate) query = query.gte("started_at", startDate);
+      if (endDate) query = query.lte("started_at", endDate);
+      // --- End date range fix ---
       query = query.order('started_at', { ascending: false }).limit(50);
       const { data, error } = await query;
       console.log('[Activity] fetchCalls result:', { data, error });
