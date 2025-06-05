@@ -35,13 +35,20 @@ const Activity = () => {
   // Fetch calls for this user and their team (missed)
   const fetchCalls = useCallback(async (silent = false) => {
     console.log('[Activity] fetchCalls called. userProfile:', userProfile, 'filters:', filters);
-    if (!userProfile) return;
+    if (!userProfile) {
+      console.warn('[Activity] fetchCalls: userProfile is null or undefined');
+      return;
+    }
+    console.log('[Activity] fetchCalls: userProfile.id =', userProfile.id, 'userProfile.team_id =', userProfile.team_id);
     if (!silent) setLoading(true);
     try {
       // Build query for user calls and missed team calls
       let query = supabase.from('call_logs').select('*');
       // Only show calls for this user or missed calls for their team
-      query = query.or(`user_id.eq.${userProfile.id},and(user_id.is.null,team_id.eq.${userProfile.team_id},status.eq.missed)`);
+      const userId = userProfile.id;
+      const teamId = userProfile.team_id;
+      console.log('[Activity] fetchCalls: using userId =', userId, 'teamId =', teamId);
+      query = query.or(`user_id.eq.${userId},and(user_id.is.null,team_id.eq.${teamId},status.eq.missed)`);
       // Apply filters
       if (filters.direction === "missed") {
         query = query.eq("status", "missed");
@@ -56,9 +63,12 @@ const Activity = () => {
       query = query.order('started_at', { ascending: false }).limit(50);
       const { data, error } = await query;
       console.log('[Activity] fetchCalls result:', { data, error });
+      if (error) {
+        console.error('[Activity] Supabase error:', error);
+      }
       setCalls(error ? [] : data || []);
     } catch (error) {
-      console.error("Error fetching calls:", error);
+      console.error("[Activity] Exception fetching calls:", error);
       setCalls([]);
     } finally {
       if (!silent) setLoading(false);

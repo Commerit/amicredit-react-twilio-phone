@@ -55,7 +55,7 @@ export function AuthProvider({ children }) {
     console.log('[AuthContext] fetchUserProfile called with userId:', userId);
     const { data, error } = await supabase
       .from('users')
-      .select('email, full_name, twilio_phone_number, role')
+      .select('id, email, full_name, twilio_phone_number, role, team_id')
       .eq('id', userId)
       .single();
     console.log('[AuthContext] fetchUserProfile result:', { userId, data, error });
