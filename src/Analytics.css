@@ -1,8 +1,9 @@
 .analytics-container {
-  max-width: 1200px;
+  max-width: 900px;
   margin: 0 auto;
   padding: 32px 16px 16px 16px;
-  min-height: 100vh;
+  height: 100vh;
+  overflow-y: auto;
   background: #f9f9f9;
 }
 
@@ -32,7 +33,7 @@
 
 .analytics-cards {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  grid-template-columns: repeat(2, 1fr);
   gap: 24px;
   margin-top: 12px;
 }
@@ -73,7 +74,7 @@
   margin-top: 2px;
 }
 
-@media (max-width: 700px) {
+@media (max-width: 900px) {
   .analytics-cards {
     grid-template-columns: 1fr;
     gap: 16px;
