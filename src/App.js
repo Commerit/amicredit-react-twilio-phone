@@ -334,12 +334,12 @@ function AppSection() {
   return (
     <div className="app">
       <TopRightLogout />
-      <main className="main-content">{mainContent}</main>
+      <main className="main-content">
+        {mainContent}
+        {console.log('[AppSection] Rendering Phone mainContent:', section)}
+      </main>
       <NavigationBar active={section} onChange={handleNavChange} />
       <audio ref={ringerRef} src={ringtoneUrl} loop />
-      {incomingConn && incomingRinging && (
-        <Incoming device={device} connection={incomingConn} caller={incomingCaller} onClear={clearIncoming} onAcceptUI={handleAcceptIncoming} />
-      )}
     </div>
   );
 }
