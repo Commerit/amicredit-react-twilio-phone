@@ -346,13 +346,19 @@ app.post("/twilio/call-status", async (req, res) => {
               ? user.id
               : (existingCallLog ? existingCallLog.user_id : null))
     };
-    console.log('[CALL-STATUS] Upserting call log:', upsertData);
-    const result = await supabase.from('call_logs').upsert(upsertData, { onConflict: 'id' });
-    if (result.error) {
-      console.error("Error upserting call log:", result.error);
-      return res.status(500).json({ error: "Failed to log call" });
+    // Only upsert if both user_id and team_id are present
+    if (upsertData.user_id && upsertData.team_id) {
+      console.log('[CALL-STATUS] Upserting call log:', upsertData);
+      const result = await supabase.from('call_logs').upsert(upsertData, { onConflict: 'id' });
+      if (result.error) {
+        console.error("Error upserting call log:", result.error);
+        return res.status(500).json({ error: "Failed to log call" });
+      }
+      console.log("Call log upserted successfully", upsertData);
+    } else {
+      console.log('[CALL-STATUS] Skipping upsert: missing user_id or team_id', upsertData);
+      return res.sendStatus(200);
     }
-    console.log("Call log upserted successfully", upsertData);
     // Only log child calls with status 'completed' or parent call
     if (ParentCallSid && CallStatus !== 'completed') {
       // Only log missed for child if status is missed

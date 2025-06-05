@@ -290,6 +290,13 @@ function AppSection() {
     setIncomingRinging(false);
   };
 
+  // Handler for Accept in global Incoming modal
+  const handleAcceptIncoming = () => {
+    setIncomingRinging(false);
+    // Optionally, you could trigger other UI state changes here if needed
+    // e.g., show the in-call UI, etc.
+  };
+
   // Section rendering based on URL
   let mainContent;
   if (section === "dialer") {
@@ -331,7 +338,7 @@ function AppSection() {
       <NavigationBar active={section} onChange={handleNavChange} />
       <audio ref={ringerRef} src={ringtoneUrl} loop />
       {incomingConn && incomingRinging && (
-        <Incoming device={device} connection={incomingConn} caller={incomingCaller} onClear={clearIncoming} />
+        <Incoming device={device} connection={incomingConn} caller={incomingCaller} onClear={clearIncoming} onAcceptUI={handleAcceptIncoming} />
       )}
     </div>
   );
