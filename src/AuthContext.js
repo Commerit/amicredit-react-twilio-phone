@@ -50,6 +50,7 @@ export function AuthProvider({ children }) {
       .select('email, full_name, twilio_phone_number, role')
       .eq('id', userId)
       .single();
+    console.log('fetchUserProfile', { userId, data, error });
     if (!error) setUserProfile(data);
   }
 
