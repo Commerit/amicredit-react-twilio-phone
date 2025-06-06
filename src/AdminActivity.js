@@ -172,13 +172,14 @@ const AdminActivity = () => {
     <div className="activity-container">
       <div className="activity-header">
         <h2>Admin Call Activity</h2>
-        <div className="activity-filters">
+        <div className="activity-filters" style={{ display: 'flex', flexWrap: 'wrap', gap: 12, rowGap: 12, alignItems: 'center' }}>
           <input
             type="text"
             placeholder="Search by number..."
             value={filters.search}
             onChange={(e) => handleFilterChange("search", e.target.value)}
             className="search-input"
+            style={{ flex: '1 1 180px', minWidth: 180 }}
           />
           <Select
             mode="multiple"
@@ -186,7 +187,7 @@ const AdminActivity = () => {
             placeholder="Filter by user(s)"
             value={filters.users}
             onChange={v => handleFilterChange('users', v)}
-            style={{ minWidth: 160 }}
+            style={{ flex: '1 1 180px', minWidth: 180 }}
             options={users.map(u => ({ value: u.id, label: u.full_name }))}
           />
           <Select
@@ -195,13 +196,14 @@ const AdminActivity = () => {
             placeholder="Filter by team(s)"
             value={filters.teams}
             onChange={v => handleFilterChange('teams', v)}
-            style={{ minWidth: 160 }}
+            style={{ flex: '1 1 180px', minWidth: 180 }}
             options={teams.map(t => ({ value: t.id, label: t.name }))}
           />
           <select
             value={filters.direction}
             onChange={(e) => handleFilterChange("direction", e.target.value)}
             className="filter-select"
+            style={{ flex: '1 1 120px', minWidth: 120 }}
           >
             <option value="">All Calls</option>
             <option value="inbound">Inbound</option>
@@ -213,14 +215,14 @@ const AdminActivity = () => {
             value={filters.startDate}
             onChange={e => handleFilterChange("startDate", e.target.value)}
             className="filter-select"
-            style={{ minWidth: 120 }}
+            style={{ flex: '1 1 120px', minWidth: 120 }}
           />
           <input
             type="date"
             value={filters.endDate}
             onChange={e => handleFilterChange("endDate", e.target.value)}
             className="filter-select"
-            style={{ minWidth: 120 }}
+            style={{ flex: '1 1 120px', minWidth: 120 }}
           />
         </div>
       </div>
