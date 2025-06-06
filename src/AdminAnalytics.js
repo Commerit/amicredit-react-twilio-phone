@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from './AuthContext';
-import { Card, Button, Spin, DatePicker, Radio, Select } from 'antd';
+import { Card, Button, DatePicker, Radio, Select } from 'antd';
 import {
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, Legend
 } from 'recharts';
