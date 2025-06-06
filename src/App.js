@@ -194,7 +194,7 @@ function AppRoutes() {
 }
 
 function AppSection() {
-  const { userId, section, callId } = useParams();
+  const { userId, section } = useParams();
   const [token, setToken] = useState(null);
   const [device, setDevice] = useState(null);
   const [incomingConn, setIncomingConn] = useState(null);

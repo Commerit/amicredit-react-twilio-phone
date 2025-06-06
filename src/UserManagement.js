@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { useAuth } from './AuthContext';
 
 export default function UserManagement() {
-  const { userProfile } = useAuth();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');

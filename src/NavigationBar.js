@@ -2,14 +2,6 @@ import React from "react";
 import "./NavigationBar.css";
 import { useAuth } from './AuthContext';
 
-const navItems = [
-  { key: "dialer", label: "Dialer", icon: "\u260E\uFE0F" }, // phone emoji
-  { key: "activity", label: "Activity", icon: "\u23F2" }, // clock emoji
-  { key: "contacts", label: "Contacts", icon: "\uD83D\uDC65" }, // people emoji
-  { key: "analytics", label: "Analytics", icon: "\uD83D\uDCCA" }, // bar chart emoji
-  { key: "settings", label: "Settings", icon: "\u2699\uFE0F" }, // gear emoji
-];
-
 export default function NavigationBar({ active, onChange }) {
   const { userProfile } = useAuth();
   if (!userProfile) return null;
