@@ -601,6 +601,98 @@ app.post('/api/seed-initial-agent', async (req, res) => {
   }
 });
 
+// =====================
+// USER MANAGEMENT API (ADMIN ONLY)
+// =====================
+
+// TODO: Add authentication/authorization middleware to restrict to admins only
+
+// List all users
+app.get('/api/users', async (req, res) => {
+  try {
+    // TODO: Restrict to admin users only
+    const { data: users, error } = await supabase.from('users').select('*');
+    if (error) return res.status(500).json({ error: error.message });
+    res.json(users);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch users' });
+  }
+});
+
+// Add a new user
+app.post('/api/users', async (req, res) => {
+  try {
+    // TODO: Restrict to admin users only
+    const { email, password, full_name, phone, team_id, role } = req.body;
+    // 1. Create user in Supabase Auth
+    const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+    });
+    if (authError) return res.status(400).json({ error: authError.message });
+    // 2. Insert user profile in users table
+    const { data: user, error: userError } = await supabase.from('users').insert({
+      id: authUser.user.id,
+      email,
+      full_name,
+      twilio_phone_number: phone,
+      team_id,
+      role: role || 'agent',
+    }).select().single();
+    if (userError) return res.status(400).json({ error: userError.message });
+    res.status(201).json(user);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to create user' });
+  }
+});
+
+// Edit a user
+app.put('/api/users/:id', async (req, res) => {
+  try {
+    // TODO: Restrict to admin users only
+    const { id } = req.params;
+    const { email, password, full_name, phone, team_id, role } = req.body;
+    // 1. Update user in Supabase Auth (if email or password provided)
+    if (email || password) {
+      const updates = {};
+      if (email) updates.email = email;
+      if (password) updates.password = password;
+      const { error: authError } = await supabase.auth.admin.updateUserById(id, updates);
+      if (authError) return res.status(400).json({ error: authError.message });
+    }
+    // 2. Update user profile in users table
+    const { data: user, error: userError } = await supabase.from('users').update({
+      email,
+      full_name,
+      twilio_phone_number: phone,
+      team_id,
+      role,
+    }).eq('id', id).select().single();
+    if (userError) return res.status(400).json({ error: userError.message });
+    res.json(user);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to update user' });
+  }
+});
+
+// Delete a user
+app.delete('/api/users/:id', async (req, res) => {
+  try {
+    // TODO: Restrict to admin users only
+    const { id } = req.params;
+    // 1. Delete user from Supabase Auth
+    const { error: authError } = await supabase.auth.admin.deleteUser(id);
+    if (authError) return res.status(400).json({ error: authError.message });
+    // 2. Delete user profile from users table
+    const { error: userError } = await supabase.from('users').delete().eq('id', id);
+    if (userError) return res.status(400).json({ error: userError.message });
+    res.status(204).send();
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to delete user' });
+  }
+});
+
 // Catch-all handler to serve React's index.html for any other requests (client-side routing)
 app.get("*", (req, res) => {
   res.sendFile(path.join(__dirname, "../build", "index.html"));

@@ -1,6 +1,6 @@
 import React from "react";
 import "./NavigationBar.css";
-// import { useAuth } from './AuthContext';
+import { useAuth } from './AuthContext';
 
 const navItems = [
   { key: "dialer", label: "Dialer", icon: "\u260E\uFE0F" }, // phone emoji
@@ -10,14 +10,30 @@ const navItems = [
   { key: "settings", label: "Settings", icon: "\u2699\uFE0F" }, // gear emoji
 ];
 
-const NavigationBar = ({ active, onChange }) => {
+export default function NavigationBar({ active, onChange }) {
+  const { userProfile } = useAuth();
+  if (!userProfile) return null;
+  const isAdmin = userProfile.role === 'admin';
+  const tabs = isAdmin
+    ? [
+        { key: 'analytics', label: 'Analytics', icon: '📊' },
+        { key: 'activity', label: 'Activity', icon: '📞' },
+        { key: 'user-management', label: 'Users', icon: '👥' },
+      ]
+    : [
+        { key: 'dialer', label: 'Dialer', icon: '📞' },
+        { key: 'contacts', label: 'Contacts', icon: '👤' },
+        { key: 'analytics', label: 'Analytics', icon: '📊' },
+        { key: 'activity', label: 'Activity', icon: '📋' },
+        { key: 'settings', label: 'Settings', icon: '⚙️' },
+      ];
   const handleNav = (key) => {
     onChange(key);
   };
   return (
     <nav className="navigation-bar">
       <div className="nav-items">
-        {navItems.map((item) => (
+        {tabs.map((item) => (
           <button
             key={item.key}
             className={`nav-item${active === item.key ? " active" : ""}`}
@@ -31,6 +47,4 @@ const NavigationBar = ({ active, onChange }) => {
       </div>
     </nav>
   );
-}
-
-export default NavigationBar; 
+} 

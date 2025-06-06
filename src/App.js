@@ -11,6 +11,7 @@ import NavigationBar from "./NavigationBar";
 import { Device } from "twilio-client";
 import Settings from "./Settings";
 import Analytics from "./Analytics";
+import UserManagement from './UserManagement';
 
 // --- Contacts Page ---
 function Contacts() {
@@ -201,8 +202,9 @@ function AppSection() {
   const [incomingRinging, setIncomingRinging] = useState(false);
   const tokenRef = useRef(token);
   const ringerRef = useRef();
-  const { user } = useAuth();
+  const { user, userProfile } = useAuth();
   const [phoneReady, setPhoneReady] = useState(false);
+  const isAdmin = userProfile && userProfile.role === 'admin';
 
   useEffect(() => { tokenRef.current = token; }, [token]);
 
@@ -288,32 +290,39 @@ function AppSection() {
 
   // Section rendering based on URL
   let mainContent;
-  if (section === "dialer") {
-    // No pre-populated number
-    if (!token || !device || !phoneReady) {
-      mainContent = (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
-          <div className="spinner" style={{ width: 48, height: 48, border: '4px solid #eee', borderTop: '4px solid #e65c00', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
-          <div style={{ marginTop: 16, color: '#888', fontSize: 16 }}>Connecting phone...</div>
-        </div>
-      );
+  if (isAdmin) {
+    if (section === 'analytics') {
+      mainContent = <Analytics adminMode />;
+    } else if (section === 'activity') {
+      mainContent = <Activity adminMode />;
+    } else if (section === 'user-management') {
+      mainContent = <UserManagement />;
     } else {
-      mainContent = <Phone token={token} device={device} initialNumber="" setNumberInUrl={() => {}} />;
+      mainContent = <Navigate to={`/app/${userId}/analytics`} replace />;
     }
-  } else if (section === "activity") {
-    if (callId) {
-      mainContent = <Activity callId={callId} />;
-    } else {
-      mainContent = <Activity />;
-    }
-  } else if (section === "contacts") {
-    mainContent = <Contacts />;
-  } else if (section === "analytics") {
-    mainContent = <Analytics />;
-  } else if (section === "settings") {
-    mainContent = <Settings />;
   } else {
-    mainContent = <Navigate to={`/app/${userId}/dialer`} replace />;
+    if (section === 'dialer') {
+      if (!token || !device || !phoneReady) {
+        mainContent = (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+            <div className="spinner" style={{ width: 48, height: 48, border: '4px solid #eee', borderTop: '4px solid #e65c00', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+            <div style={{ marginTop: 16, color: '#888', fontSize: 16 }}>Connecting phone...</div>
+          </div>
+        );
+      } else {
+        mainContent = <Phone token={token} device={device} initialNumber="" setNumberInUrl={() => {}} />;
+      }
+    } else if (section === 'contacts') {
+      mainContent = <Contacts />;
+    } else if (section === 'activity') {
+      mainContent = <Activity />;
+    } else if (section === 'analytics') {
+      mainContent = <Analytics />;
+    } else if (section === 'settings') {
+      mainContent = <Settings />;
+    } else {
+      mainContent = <Navigate to={`/app/${userId}/dialer`} replace />;
+    }
   }
 
   // Navigation bar handler
