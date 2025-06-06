@@ -12,6 +12,8 @@ import { Device } from "twilio-client";
 import Settings from "./Settings";
 import Analytics from "./Analytics";
 import UserManagement from './UserManagement';
+import AdminAnalytics from './AdminAnalytics';
+import AdminActivity from './AdminActivity';
 
 // --- Contacts Page ---
 function Contacts() {
@@ -292,9 +294,9 @@ function AppSection() {
   let mainContent;
   if (isAdmin) {
     if (section === 'analytics') {
-      mainContent = <Analytics adminMode />;
+      mainContent = <AdminAnalytics />;
     } else if (section === 'activity') {
-      mainContent = <Activity adminMode />;
+      mainContent = <AdminActivity />;
     } else if (section === 'user-management') {
       mainContent = <UserManagement />;
     } else {
