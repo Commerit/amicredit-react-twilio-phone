@@ -693,6 +693,31 @@ app.delete('/api/users/:id', async (req, res) => {
   }
 });
 
+// Minimal call endpoint for direct agent call UI
+app.get("/call/:agentId", async (req, res) => {
+  const { agentId } = req.params;
+  const { number } = req.query;
+  if (!number) {
+    return res.status(400).send("Phone number is required");
+  }
+  try {
+    // Verify the agent exists
+    const { data: agent, error: agentError } = await supabase
+      .from('users')
+      .select('id')
+      .eq('id', agentId)
+      .single();
+    if (agentError || !agent) {
+      return res.status(404).send("Agent not found");
+    }
+    // Serve the React app (the route will be handled client-side)
+    res.sendFile(path.join(__dirname, '../build/index.html'));
+  } catch (error) {
+    console.error('Error in /call/:agentId:', error);
+    res.status(500).send("Internal server error");
+  }
+});
+
 // Catch-all handler to serve React's index.html for any other requests (client-side routing)
 app.get("*", (req, res) => {
   res.sendFile(path.join(__dirname, "../build", "index.html"));

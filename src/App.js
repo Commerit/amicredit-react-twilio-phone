@@ -14,6 +14,7 @@ import Analytics from "./Analytics";
 import UserManagement from './UserManagement';
 import AdminAnalytics from './AdminAnalytics';
 import AdminActivity from './AdminActivity';
+import MinimalCallRoute from "./MinimalCallRoute";
 
 // --- Contacts Page ---
 function Contacts() {
@@ -188,6 +189,7 @@ function AppRoutes() {
       <Route path="/login" element={<Login />} />
       <Route path="/signup" element={<Signup />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/call/:agentId" element={<MinimalCallRoute />} />
       <Route path="/app/:userId/:section" element={<PrivateRoute><AppSection /></PrivateRoute>} />
       <Route path="/app/:userId/activity/:callId" element={<PrivateRoute><AppSection /></PrivateRoute>} />
       <Route path="*" element={<Navigate to="/login" replace />} />
