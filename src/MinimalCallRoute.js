@@ -46,7 +46,7 @@ const MinimalCallRoute = () => {
       </div>
     );
   }
-  return <MinimalCall token={token} phoneNumber={phoneNumber} />;
+  return <MinimalCall token={token} phoneNumber={phoneNumber} agentId={agentId} />;
 };
 
 export default MinimalCallRoute; 
