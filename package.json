@@ -25,8 +25,7 @@
     "test": "react-scripts test",
     "eject": "react-scripts eject",
     "sync-history": "node scripts/sync-twilio-history.js",
-    "test-webhooks": "node scripts/test-webhooks.js",
-    "build:widget": "vite build"
+    "test-webhooks": "node scripts/test-webhooks.js"
   },
   "proxy": "http://localhost:3001",
   "eslintConfig": {

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import ReactDOM from 'react-dom';
-import MinimalCall from './MinimalCall.jsx';
+import MinimalCall from './MinimalCall';
 import './CallWidget.css';
 
 const CallWidget = ({ agentId, phoneNumber, onClose }) => {
@@ -67,8 +67,8 @@ const CallWidget = ({ agentId, phoneNumber, onClose }) => {
   );
 };
 
-// Export the function as the UMD global
-function initCallWidget(config) {
+// Expose a global function for embedding
+window.initCallWidget = (config) => {
   const { agentId, phoneNumber, containerId = 'call-widget-container' } = config;
   let container = document.getElementById(containerId);
   if (!container) {
@@ -87,6 +87,6 @@ function initCallWidget(config) {
     />,
     container
   );
-}
+};
 
-export default initCallWidget; 
+export default CallWidget; 
