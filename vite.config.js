@@ -6,7 +6,7 @@ export default defineConfig({
   build: {
     lib: {
       entry: 'src/CallWidget.jsx',
-      name: 'CallWidget',
+      name: 'initCallWidget',
       fileName: 'call-widget',
       formats: ['umd'],
     },
@@ -17,6 +17,7 @@ export default defineConfig({
           react: 'React',
           'react-dom': 'ReactDOM',
         },
+        globalObject: 'window',
       },
     },
     outDir: 'public',

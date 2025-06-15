@@ -67,8 +67,8 @@ const CallWidget = ({ agentId, phoneNumber, onClose }) => {
   );
 };
 
-// Expose a global function for embedding
-window.initCallWidget = (config) => {
+// Export the function as the UMD global
+function initCallWidget(config) {
   const { agentId, phoneNumber, containerId = 'call-widget-container' } = config;
   let container = document.getElementById(containerId);
   if (!container) {
@@ -87,6 +87,6 @@ window.initCallWidget = (config) => {
     />,
     container
   );
-};
+}
 
-export default CallWidget; 
+export default initCallWidget; 
