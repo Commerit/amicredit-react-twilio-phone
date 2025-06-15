@@ -10,33 +10,22 @@ const MinimalCall = ({ token, phoneNumber, agentId }) => {
   const [timer, setTimer] = useState(0);
   const timerRef = useRef();
   const [isMuted, setIsMuted] = useState(false);
+  const [calling, setCalling] = useState(false);
 
   useEffect(() => {
     const device = new Device();
     device.setup(token, { debug: true });
 
-    device.on("ready", async () => {
+    device.on("ready", () => {
       setDevice(device);
       setState("ready");
-      if (phoneNumber && agentId) {
-        // Create pending call record before connecting
-        try {
-          await fetch('/voice', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ To: phoneNumber, user_id: agentId })
-          });
-        } catch (err) {
-          console.error('Error creating pending call:', err);
-        }
-        device.connect({ To: phoneNumber, user_id: agentId });
-      }
     });
 
     device.on("connect", connection => {
       setConn(connection);
       setState("on_call");
       setCallStart(Date.now());
+      setCalling(false);
     });
 
     device.on("disconnect", () => {
@@ -45,6 +34,7 @@ const MinimalCall = ({ token, phoneNumber, agentId }) => {
       setCallStart(null);
       setTimer(0);
       setIsMuted(false);
+      setCalling(false);
       window.close();
     });
 
@@ -53,7 +43,7 @@ const MinimalCall = ({ token, phoneNumber, agentId }) => {
       setDevice(null);
       setState("offline");
     };
-  }, [token, phoneNumber, agentId]);
+  }, [token]);
 
   useEffect(() => {
     if (state === "on_call" && callStart) {
@@ -66,6 +56,22 @@ const MinimalCall = ({ token, phoneNumber, agentId }) => {
       clearInterval(timerRef.current);
     }
   }, [state, callStart]);
+
+  const handleCall = async () => {
+    if (!device || !phoneNumber || !agentId || calling) return;
+    setCalling(true);
+    try {
+      await fetch('/voice', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ To: phoneNumber, user_id: agentId })
+      });
+      device.connect({ To: phoneNumber, user_id: agentId });
+    } catch (err) {
+      setCalling(false);
+      console.error('Error starting call:', err);
+    }
+  };
 
   const handleHangup = () => {
     device.disconnectAll();
@@ -91,15 +97,26 @@ const MinimalCall = ({ token, phoneNumber, agentId }) => {
         {state === "on_call" && `On Call ${timer}s`}
       </div>
       <div className="call-controls">
+        {state === "ready" && (
+          <button 
+            onClick={handleCall}
+            className="call-button"
+            disabled={calling}
+          >
+            {calling ? 'Calling...' : 'Call'}
+          </button>
+        )}
         <button 
           onClick={toggleMute}
           className={`mute-button ${isMuted ? 'muted' : ''}`}
+          disabled={state !== "on_call"}
         >
           {isMuted ? 'Unmute' : 'Mute'}
         </button>
         <button 
           onClick={handleHangup}
           className="hangup-button"
+          disabled={state !== "on_call"}
         >
           End Call
         </button>
