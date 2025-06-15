@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { Device } from "twilio-client";
 import "./MinimalCall.css";
 
-const MinimalCall = ({ token, phoneNumber }) => {
+const MinimalCall = ({ token, phoneNumber, agentId }) => {
   const [state, setState] = useState("connecting");
   const [conn, setConn] = useState(null);
   const [device, setDevice] = useState(null);
@@ -15,11 +15,20 @@ const MinimalCall = ({ token, phoneNumber }) => {
     const device = new Device();
     device.setup(token, { debug: true });
 
-    device.on("ready", () => {
+    device.on("ready", async () => {
       setDevice(device);
       setState("ready");
       if (phoneNumber) {
-        device.connect({ To: phoneNumber });
+        try {
+          await fetch('/voice', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ To: phoneNumber, user_id: agentId })
+          });
+        } catch (e) {
+          console.error('[MinimalCall] /voice pre-call failed', e);
+        }
+        device.connect({ To: phoneNumber, user_id: agentId });
       }
     });
 
@@ -43,7 +52,7 @@ const MinimalCall = ({ token, phoneNumber }) => {
       setDevice(null);
       setState("offline");
     };
-  }, [token, phoneNumber]);
+  }, [token, phoneNumber, agentId]);
 
   useEffect(() => {
     if (state === "on_call" && callStart) {
