@@ -225,11 +225,23 @@ app.post("/twilio/call-status", async (req, res) => {
         .single();
       if (pending && pending.user_id) {
         userId = pending.user_id;
-        console.log('[CALL-STATUS] Matched userId from pending_calls:', userId);
+        console.log('[CALL-STATUS] Matched userId from pending_calls:', userId, 'pending id:', pending.id);
         // Delete the pending call row
         await supabase.from('pending_calls').delete().eq('id', pending.id);
-      } else if (pendingError) {
-        console.error('Error looking up pending_calls:', pendingError);
+      } else {
+        console.warn('[CALL-STATUS] No pending_call match found for To', To, 'pendingError:', pendingError);
+        // Debug: fetch count of rows just for investigation
+        try {
+          const { data: allPendings, error: allPendingsErr } = await supabase
+            .from('pending_calls')
+            .select('id, user_id, to_number, created_at')
+            .eq('to_number', To)
+            .gte('created_at', new Date(Date.now() - 5 * 60 * 1000).toISOString());
+          console.log('[CALL-STATUS] Pending calls rows for number', To, ':', allPendings?.length || 0, allPendings);
+          if (allPendingsErr) console.error('[CALL-STATUS] Error fetching pending_calls list:', allPendingsErr);
+        } catch (e) {
+          console.error('[CALL-STATUS] Exception fetching pending_calls list:', e);
+        }
       }
     }
     // If custom parameter team_id is present, use it
@@ -357,6 +369,8 @@ app.post("/twilio/call-status", async (req, res) => {
       console.log("Call log upserted successfully", upsertData);
     } else {
       console.log('[CALL-STATUS] Skipping upsert: missing user_id or team_id', upsertData);
+      // Extra debug output
+      console.log('[CALL-STATUS] Debug context:', { userId_detected: userId, teamId_detected: team ? team.id : null, teamIdParam });
       return res.sendStatus(200);
     }
     // Only log child calls with status 'completed' or parent call
