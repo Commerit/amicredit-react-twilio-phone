@@ -19,7 +19,18 @@ const MinimalCall = ({ token, phoneNumber, agentId }) => {
       setDevice(device);
       setState("ready");
       if (phoneNumber) {
-        device.connect({ To: phoneNumber, user_id: agentId });
+        // Pre-notify server so pending_calls has user_id
+        try {
+          await fetch('/voice', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ To: phoneNumber, user_id: agentId })
+          });
+        } catch (e) {
+          console.error('[MinimalCall] /voice pre-call failed', e);
+        }
+        // Now initiate call without user_id param to avoid duplicate insert
+        device.connect({ To: phoneNumber });
       }
     });
 

@@ -84,10 +84,10 @@ app.post("/voice/token", (req, res) => {
 
 app.post("/voice", async (req, res) => {
   console.log('[VOICE] Incoming /voice request body:', req.body);
-  const To = req.body.To;
-  const userId = req.body.user_id;
+  const To = req.body.To || req.query.To;
+  const userId = req.body.user_id || req.query.user_id;
   const baseUrl = getBaseUrl(req);
-  // Insert pending call record
+  // Insert pending call record only if user_id present to avoid duplicates
   if (userId && To) {
     try {
       await supabase.from('pending_calls').insert({ user_id: userId, to_number: To });
