@@ -199,22 +199,23 @@ async function findTeamByNumber(phoneNumber) {
 app.post("/twilio/call-status", async (req, res) => {
   try {
     console.log('[CALL-STATUS] Incoming webhook:', req.body);
-    // Try to get userId from custom header or parameter (for outbound)
     let userId = req.headers['x-user-id'] || req.body.user_id || null;
     const { CallSid, CallStatus, From, To, Direction, Timestamp, StartTime, EndTime, Duration, CallDuration, RecordingDuration, ParentCallSid } = req.body;
-    // If From is client:USER_ID, extract USER_ID
+    if (!CallSid) {
+      console.error('[CALL-STATUS][ERROR] Missing CallSid in webhook payload:', req.body);
+    }
+    if (!From || !To) {
+      console.warn('[CALL-STATUS][WARN] Missing From or To in webhook payload:', { From, To, CallSid });
+    }
     if (!userId && typeof From === 'string' && From.startsWith('client:')) {
       userId = From.replace('client:', '');
       console.log('[CALL-STATUS] Extracted userId from From:', userId);
     }
-    // For inbound calls, if the event is 'answered' or 'in-progress' and From is not client:..., but To is client:USER_ID, extract userId from To
     if (!userId && typeof To === 'string' && To.startsWith('client:') && (CallStatus === 'answered' || CallStatus === 'in-progress')) {
       userId = To.replace('client:', '');
       console.log('[CALL-STATUS] Extracted userId from To (inbound answered):', userId);
     }
-    // If still no userId, try to find from pending_calls
     if (!userId && To) {
-      // Find the most recent pending call for this To number within the last 5 minutes
       const { data: pending, error: pendingError } = await supabase
         .from('pending_calls')
         .select('*')
@@ -226,32 +227,39 @@ app.post("/twilio/call-status", async (req, res) => {
       if (pending && pending.user_id) {
         userId = pending.user_id;
         console.log('[CALL-STATUS] Matched userId from pending_calls:', userId);
-        // Delete the pending call row
         await supabase.from('pending_calls').delete().eq('id', pending.id);
       } else if (pendingError) {
-        console.error('Error looking up pending_calls:', pendingError);
+        console.error('[CALL-STATUS][ERROR] Error looking up pending_calls:', pendingError);
+      } else {
+        console.warn('[CALL-STATUS][WARN] No pending_calls match found for To:', To);
       }
     }
-    // If custom parameter team_id is present, use it
     let teamIdParam = req.body.team_id || null;
-    // Find user and team
     let user = null, team = null, teamPhone = null;
     if (userId) {
       try {
         user = await findUserByIdOrNumber(userId);
-        console.log('[CALL-STATUS] Found user:', user);
+        if (!user) {
+          console.warn('[CALL-STATUS][WARN] No user found for userId:', userId);
+        } else {
+          console.log('[CALL-STATUS] Found user:', user);
+        }
         if (user && user.team_id) {
           team = { id: user.team_id };
-          // Fetch team phone number
           const { data: teamRow } = await supabase.from('teams').select('phone_number').eq('id', user.team_id).single();
-          if (teamRow) teamPhone = teamRow.phone_number;
-          console.log('[CALL-STATUS] Found team and phone:', team, teamPhone);
+          if (teamRow) {
+            teamPhone = teamRow.phone_number;
+            console.log('[CALL-STATUS] Found team and phone:', team, teamPhone);
+          } else {
+            console.warn('[CALL-STATUS][WARN] No team phone found for team_id:', user.team_id);
+          }
         }
       } catch (e) {
-        console.error('[CALL-STATUS] Exception looking up user/team:', e);
+        console.error('[CALL-STATUS][ERROR] Exception looking up user/team:', e);
       }
+    } else {
+      console.warn('[CALL-STATUS][WARN] No userId resolved for CallSid:', CallSid);
     }
-    // If no team yet, try to find by To or From number
     if (!teamPhone) {
       try {
         const { data: teamByTo } = await supabase.from('teams').select('id, phone_number').eq('phone_number', To).single();
@@ -259,9 +267,11 @@ app.post("/twilio/call-status", async (req, res) => {
           team = { id: teamByTo.id };
           teamPhone = teamByTo.phone_number;
           console.log('[CALL-STATUS] Matched team by To:', team, teamPhone);
+        } else {
+          console.warn('[CALL-STATUS][WARN] No team matched by To:', To);
         }
       } catch (e) {
-        console.error('[CALL-STATUS] Exception matching team by To:', e);
+        console.error('[CALL-STATUS][ERROR] Exception matching team by To:', e);
       }
     }
     if (!teamPhone) {
@@ -271,14 +281,14 @@ app.post("/twilio/call-status", async (req, res) => {
           team = { id: teamByFrom.id };
           teamPhone = teamByFrom.phone_number;
           console.log('[CALL-STATUS] Matched team by From:', team, teamPhone);
+        } else {
+          console.warn('[CALL-STATUS][WARN] No team matched by From:', From);
         }
       } catch (e) {
-        console.error('[CALL-STATUS] Exception matching team by From:', e);
+        console.error('[CALL-STATUS][ERROR] Exception matching team by From:', e);
       }
     }
-    // Classify direction
     let callDirection = 'unknown';
-    // If From is PSTN and To is client:USER_ID, it's inbound
     if (From && /^\+\d{8,15}$/.test(From) && typeof To === 'string' && To.startsWith('client:')) {
       callDirection = 'inbound';
     } else if (teamPhone) {
@@ -289,33 +299,38 @@ app.post("/twilio/call-status", async (req, res) => {
       }
     }
     if (callDirection === 'unknown') {
-      // Fallback to Twilio's Direction or 'unknown'
       callDirection = Direction || 'unknown';
+      if (callDirection === 'unknown') {
+        console.warn('[CALL-STATUS][WARN] Could not determine call direction for CallSid:', CallSid);
+      }
     }
     console.log('[CALL-STATUS] Final direction:', callDirection);
-    // Map Twilio statuses
     let internalStatus = CallStatus;
     if (CallStatus === 'busy' || CallStatus === 'no-answer' || CallStatus === 'failed') {
       internalStatus = 'missed';
     } else if (CallStatus === 'completed') {
       internalStatus = 'completed';
     }
-    // Duration
     let durationSeconds = null;
     if (CallDuration) durationSeconds = parseInt(CallDuration);
     else if (RecordingDuration) durationSeconds = parseInt(RecordingDuration);
     else if (Duration) durationSeconds = parseInt(Duration);
     else if (StartTime && EndTime) durationSeconds = Math.floor((new Date(EndTime) - new Date(StartTime)) / 1000);
-    // For answered inbound, try to get user who answered (if available)
+    if (durationSeconds === null) {
+      console.warn('[CALL-STATUS][WARN] Could not determine duration for CallSid:', CallSid);
+    }
     if (!user && req.body.answered_by_user_id) {
       try {
         user = await findUserByIdOrNumber(req.body.answered_by_user_id);
-        console.log('[CALL-STATUS] Found user by answered_by_user_id:', user);
+        if (user) {
+          console.log('[CALL-STATUS] Found user by answered_by_user_id:', user);
+        } else {
+          console.warn('[CALL-STATUS][WARN] No user found for answered_by_user_id:', req.body.answered_by_user_id);
+        }
       } catch (e) {
-        console.error('[CALL-STATUS] Exception looking up answered_by_user_id:', e);
+        console.error('[CALL-STATUS][ERROR] Exception looking up answered_by_user_id:', e);
       }
     }
-    // Fetch existing call log if it exists
     let existingCallLog = null;
     try {
       const { data: existing, error: fetchError } = await supabase
@@ -325,7 +340,7 @@ app.post("/twilio/call-status", async (req, res) => {
         .single();
       if (existing) existingCallLog = existing;
     } catch (e) {
-      console.error('[CALL-STATUS] Exception fetching existing call log:', e);
+      console.error('[CALL-STATUS][ERROR] Exception fetching existing call log:', e);
     }
     const upsertData = {
       id: CallSid,
@@ -346,29 +361,33 @@ app.post("/twilio/call-status", async (req, res) => {
               ? user.id
               : (existingCallLog ? existingCallLog.user_id : null))
     };
-    // Only upsert if both user_id and team_id are present
+    if (!upsertData.user_id) {
+      console.warn('[CALL-STATUS][WARN] Skipping upsert: missing user_id for CallSid:', CallSid, upsertData);
+    }
+    if (!upsertData.team_id) {
+      console.warn('[CALL-STATUS][WARN] Skipping upsert: missing team_id for CallSid:', CallSid, upsertData);
+    }
     if (upsertData.user_id && upsertData.team_id) {
       console.log('[CALL-STATUS] Upserting call log:', upsertData);
       const result = await supabase.from('call_logs').upsert(upsertData, { onConflict: 'id' });
       if (result.error) {
-        console.error("Error upserting call log:", result.error);
+        console.error('[CALL-STATUS][ERROR] Error upserting call log:', result.error, 'Payload:', upsertData);
         return res.status(500).json({ error: "Failed to log call" });
       }
-      console.log("Call log upserted successfully", upsertData);
+      console.log('[CALL-STATUS] Call log upserted successfully', upsertData);
     } else {
       console.log('[CALL-STATUS] Skipping upsert: missing user_id or team_id', upsertData);
       return res.sendStatus(200);
     }
-    // Only log child calls with status 'completed' or parent call
     if (ParentCallSid && CallStatus !== 'completed') {
-      // Only log missed for child if status is missed
       if (internalStatus !== 'missed') {
+        console.log('[CALL-STATUS] Skipping child call log (not completed or missed):', { CallSid, ParentCallSid, CallStatus, internalStatus });
         return res.sendStatus(200);
       }
     }
     res.sendStatus(200);
   } catch (error) {
-    console.error("Exception in call-status webhook:", error);
+    console.error('[CALL-STATUS][ERROR] Exception in call-status webhook:', error, 'Payload:', req.body);
     res.status(500).json({ error: "Internal server error" });
   }
 });

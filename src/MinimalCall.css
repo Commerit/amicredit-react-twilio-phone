@@ -50,4 +50,10 @@
 
 .mute-button:active, .hangup-button:active {
   transform: scale(0.95);
+}
+
+.timer {
+  font-size: 1.2rem;
+  margin-top: 1rem;
+  color: #333;
 } 

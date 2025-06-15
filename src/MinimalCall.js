@@ -16,9 +16,24 @@ const MinimalCall = ({ token, phoneNumber, agentId }) => {
     const device = new Device();
     device.setup(token, { debug: true });
 
-    device.on("ready", () => {
+    device.on("ready", async () => {
       setDevice(device);
       setState("ready");
+      if (phoneNumber && /^\+\d{8,15}$/.test(phoneNumber) && agentId && !calling) {
+        setCalling(true);
+        try {
+          await fetch('/voice', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ To: phoneNumber, user_id: agentId })
+          });
+          device.connect({ To: phoneNumber, user_id: agentId });
+        } catch (err) {
+          setCalling(false);
+          setState("error");
+          console.error('Error starting call:', err);
+        }
+      }
     });
 
     device.on("connect", connection => {
@@ -43,7 +58,7 @@ const MinimalCall = ({ token, phoneNumber, agentId }) => {
       setDevice(null);
       setState("offline");
     };
-  }, [token]);
+  }, [token, phoneNumber, agentId, calling]);
 
   useEffect(() => {
     if (state === "on_call" && callStart) {
@@ -57,24 +72,8 @@ const MinimalCall = ({ token, phoneNumber, agentId }) => {
     }
   }, [state, callStart]);
 
-  const handleCall = async () => {
-    if (!device || !phoneNumber || !agentId || calling) return;
-    setCalling(true);
-    try {
-      await fetch('/voice', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ To: phoneNumber, user_id: agentId })
-      });
-      device.connect({ To: phoneNumber, user_id: agentId });
-    } catch (err) {
-      setCalling(false);
-      console.error('Error starting call:', err);
-    }
-  };
-
   const handleHangup = () => {
-    device.disconnectAll();
+    if (device) device.disconnectAll();
   };
 
   const toggleMute = () => {
@@ -93,19 +92,11 @@ const MinimalCall = ({ token, phoneNumber, agentId }) => {
     <div className="minimal-call-container">
       <div className="call-status">
         {state === "connecting" && "Connecting..."}
-        {state === "ready" && "Ready"}
+        {state === "ready" && calling && "Calling..."}
         {state === "on_call" && `On Call ${timer}s`}
+        {state === "error" && "Error connecting to call"}
       </div>
       <div className="call-controls">
-        {state === "ready" && (
-          <button 
-            onClick={handleCall}
-            className="call-button"
-            disabled={calling}
-          >
-            {calling ? 'Calling...' : 'Call'}
-          </button>
-        )}
         <button 
           onClick={toggleMute}
           className={`mute-button ${isMuted ? 'muted' : ''}`}
