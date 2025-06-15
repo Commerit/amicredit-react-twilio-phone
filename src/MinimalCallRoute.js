@@ -13,14 +13,9 @@ const MinimalCallRoute = () => {
       try {
         // Get the phone number from the URL query parameters
         const params = new URLSearchParams(window.location.search);
-        let number = params.get('number');
+        const number = params.get('number');
         if (!number) {
           throw new Error('Phone number is required');
-        }
-        // Sanitize phone number: trim, remove all spaces, ensure leading +
-        number = number.replace(/\s+/g, '');
-        if (!number.startsWith('+')) {
-          number = '+' + number;
         }
         // Fetch the Twilio token
         const response = await fetch(`/voice/token?identity=${encodeURIComponent(agentId)}`);
@@ -51,7 +46,7 @@ const MinimalCallRoute = () => {
       </div>
     );
   }
-  return <MinimalCall token={token} phoneNumber={phoneNumber} agentId={agentId} />;
+  return <MinimalCall token={token} phoneNumber={phoneNumber} />;
 };
 
 export default MinimalCallRoute; 
