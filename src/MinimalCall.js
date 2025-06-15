@@ -114,7 +114,7 @@ const MinimalCall = ({ token, phoneNumber, agentId }) => {
   return (
     <div className="minimal-call-container">
       <div className="call-status">
-        {state === "connecting" && "Connecting..."}
+        {state === "connecting" && "Loading phone..."}
         {state === "ready" && calling && "Calling..."}
         {state === "on_call" && `On Call ${timer}s`}
         {state === "error" && "Error connecting to call"}
