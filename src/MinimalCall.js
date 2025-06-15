@@ -11,6 +11,14 @@ const MinimalCall = ({ token, phoneNumber, agentId }) => {
   const timerRef = useRef();
   const [isMuted, setIsMuted] = useState(false);
 
+  // Helper to normalize phone number to E.164 (trim, ensure leading +, remove spaces)
+  const normalizeNumber = n => {
+    if (!n) return '';
+    let num = n.trim().replace(/\s+/g, '');
+    if (!num.startsWith('+')) num = '+' + num.replace(/^\+/, '');
+    return num;
+  };
+
   useEffect(() => {
     const device = new Device();
     device.setup(token, { debug: true });
@@ -19,18 +27,19 @@ const MinimalCall = ({ token, phoneNumber, agentId }) => {
       setDevice(device);
       setState("ready");
       if (phoneNumber) {
+        const normalizedNumber = normalizeNumber(phoneNumber);
         // Pre-notify server so pending_calls has user_id
         try {
           await fetch('/voice', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ To: phoneNumber, user_id: agentId })
+            body: JSON.stringify({ To: normalizedNumber, user_id: agentId })
           });
         } catch (e) {
           console.error('[MinimalCall] /voice pre-call failed', e);
         }
         // Now initiate call without user_id param to avoid duplicate insert
-        device.connect({ To: phoneNumber });
+        device.connect({ To: normalizedNumber });
       }
     });
 
