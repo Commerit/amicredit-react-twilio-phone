@@ -83,6 +83,7 @@ app.post("/voice/token", (req, res) => {
 });
 
 app.post("/voice", async (req, res) => {
+  console.log('[VOICE] Incoming /voice request body:', req.body);
   const To = req.body.To;
   const userId = req.body.user_id;
   const baseUrl = getBaseUrl(req);
