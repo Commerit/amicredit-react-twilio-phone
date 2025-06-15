@@ -11,9 +11,9 @@ const MinimalCall = ({ token, phoneNumber, agentId }) => {
   const timerRef = useRef();
   const [isMuted, setIsMuted] = useState(false);
 
-  // Helper to normalize phone number to E.164 (trim, ensure leading +, remove spaces)
+  // Helper to normalize phone number to E.164
   const normalizeNumber = n => {
-    if (!n) return '';
+    if (!n) return n;
     let num = n.trim().replace(/\s+/g, '');
     if (!num.startsWith('+')) num = '+' + num.replace(/^\+/, '');
     return num;
