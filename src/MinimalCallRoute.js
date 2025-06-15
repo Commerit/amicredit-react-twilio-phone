@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
-import MinimalCall from "./MinimalCall";
+import MinimalCall from './MinimalCall.jsx';
 
 const MinimalCallRoute = () => {
   const { agentId } = useParams();
