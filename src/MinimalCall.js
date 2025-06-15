@@ -13,30 +13,41 @@ const MinimalCall = ({ token, phoneNumber, agentId }) => {
   const [calling, setCalling] = useState(false);
 
   useEffect(() => {
+    console.log('[MinimalCall] useEffect: token, phoneNumber, agentId', { token, phoneNumber, agentId });
     const device = new Device();
+    console.log('[MinimalCall] Device instance created');
     device.setup(token, { debug: true });
+    console.log('[MinimalCall] Device setup called');
 
     device.on("ready", async () => {
+      console.log('[MinimalCall] Device ready event');
       setDevice(device);
       setState("ready");
       if (phoneNumber && /^\+\d{8,15}$/.test(phoneNumber) && agentId && !calling) {
         setCalling(true);
         try {
-          await fetch('/voice', {
+          console.log('[MinimalCall] Posting to /voice', { To: phoneNumber, user_id: agentId });
+          const resp = await fetch('/voice', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ To: phoneNumber, user_id: agentId })
           });
+          const respText = await resp.text();
+          console.log('[MinimalCall] /voice response:', resp.status, respText);
+          console.log('[MinimalCall] Calling device.connect');
           device.connect({ To: phoneNumber, user_id: agentId });
         } catch (err) {
           setCalling(false);
           setState("error");
-          console.error('Error starting call:', err);
+          console.error('[MinimalCall] Error starting call:', err);
         }
+      } else {
+        console.warn('[MinimalCall] Not auto-calling: missing phoneNumber, agentId, or already calling', { phoneNumber, agentId, calling });
       }
     });
 
     device.on("connect", connection => {
+      console.log('[MinimalCall] Device connect event', connection);
       setConn(connection);
       setState("on_call");
       setCallStart(Date.now());
@@ -44,6 +55,7 @@ const MinimalCall = ({ token, phoneNumber, agentId }) => {
     });
 
     device.on("disconnect", () => {
+      console.log('[MinimalCall] Device disconnect event');
       setState("ready");
       setConn(null);
       setCallStart(null);
@@ -53,7 +65,16 @@ const MinimalCall = ({ token, phoneNumber, agentId }) => {
       window.close();
     });
 
+    device.on("error", (err) => {
+      console.error('[MinimalCall] Device error event:', err);
+    });
+
+    device.on("offline", () => {
+      console.warn('[MinimalCall] Device offline event');
+    });
+
     return () => {
+      console.log('[MinimalCall] Cleaning up device');
       device.destroy();
       setDevice(null);
       setState("offline");
@@ -73,10 +94,12 @@ const MinimalCall = ({ token, phoneNumber, agentId }) => {
   }, [state, callStart]);
 
   const handleHangup = () => {
+    console.log('[MinimalCall] handleHangup called');
     if (device) device.disconnectAll();
   };
 
   const toggleMute = () => {
+    console.log('[MinimalCall] toggleMute called', { isMuted, conn });
     if (conn) {
       if (isMuted) {
         conn.mute(false);
